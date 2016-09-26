@@ -1,4 +1,35 @@
-import { countBy, difference, each as each$1, escape as escape$1, every as every$1, filter, find, findIndex, findLastIndex, forEach, groupBy, head, includes, indexOf as indexOf$1, invoke, isEmpty, iteratee, last as last$1, lastIndexOf, map as map$1, matches, max, min, partition, pick as pick$1, reduce, sample, some as some$1, sortBy, tail, toArray, without } from 'lodash';
+import _matches from 'lodash/matches';
+import _iteratee from 'lodash/iteratee';
+import _escape from 'lodash/escape';
+import _pick from 'lodash/pick';
+import _sortBy from 'lodash/sortBy';
+import _countBy from 'lodash/countBy';
+import _groupBy from 'lodash/groupBy';
+import _partition from 'lodash/partition';
+import _sample from 'lodash/sample';
+import _isEmpty from 'lodash/isEmpty';
+import _lastIndexOf from 'lodash/lastIndexOf';
+import _indexOf from 'lodash/indexOf';
+import _difference from 'lodash/difference';
+import _without from 'lodash/without';
+import _last from 'lodash/last';
+import _tail from 'lodash/tail';
+import _head from 'lodash/head';
+import _toArray from 'lodash/toArray';
+import _min from 'lodash/min';
+import _max from 'lodash/max';
+import _invoke from 'lodash/invoke';
+import _includes from 'lodash/includes';
+import _some from 'lodash/some';
+import _every from 'lodash/every';
+import _filter from 'lodash/filter';
+import _findLastIndex from 'lodash/findLastIndex';
+import _findIndex from 'lodash/findIndex';
+import _find from 'lodash/find';
+import _reduce from 'lodash/reduce';
+import _map from 'lodash/map';
+import _each from 'lodash/each';
+import _forEach from 'lodash/forEach';
 
 var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
   return typeof obj;
@@ -207,7 +238,7 @@ function isValidJSON(value) {
         case 'object':
             var proto = Object.getPrototypeOf(value);
             if (proto === Object.prototype || proto === Array.prototype) {
-                return every$2(value, isValidJSON);
+                return every$1(value, isValidJSON);
             }
     }
     return false;
@@ -272,15 +303,15 @@ function someObject(obj, fun) {
         }
     }
 }
-function some$2(obj, fun) {
+function some$1(obj, fun) {
     if (Object.getPrototypeOf(obj) === ArrayProto) {
         return someArray(obj, fun);
     } else {
         return someObject(obj, fun);
     }
 }
-function every$2(obj, predicate) {
-    return !some$2(obj, function (x) {
+function every$1(obj, predicate) {
+    return !some$1(obj, function (x) {
         return !predicate(x);
     });
 }
@@ -418,8 +449,8 @@ var tools = Object.freeze({
 	getBaseClass: getBaseClass,
 	getChangedStatics: getChangedStatics,
 	isEmpty: isEmpty$1,
-	some: some$2,
-	every: every$2,
+	some: some$1,
+	every: every$1,
 	getPropertyDescriptor: getPropertyDescriptor,
 	omit: omit$1,
 	transform: transform$1,
@@ -1164,20 +1195,20 @@ var Messenger_1 = function () {
 var Messenger = Messenger_1;
 Messenger = Messenger_1 = __decorate([extendable$1], Messenger);
 var Events = omit$2(Messenger.prototype, 'constructor', 'initialize');
-function eventsApi(iteratee$$1, events, name, callback, opts) {
+function eventsApi(iteratee, events, name, callback, opts) {
     var i = 0,
         names = void 0;
     if (name && (typeof name === "undefined" ? "undefined" : _typeof(name)) === 'object') {
         if (callback !== void 0 && 'context' in opts && opts.context === void 0) opts.context = callback;
         for (names = keys$2(name); i < names.length; i++) {
-            events = eventsApi(iteratee$$1, events, names[i], name[names[i]], opts);
+            events = eventsApi(iteratee, events, names[i], name[names[i]], opts);
         }
     } else if (name && eventSplitter$$1.test(name)) {
         for (names = name.split(eventSplitter$$1); i < names.length; i++) {
-            events = iteratee$$1(events, names[i], callback, opts);
+            events = iteratee(events, names[i], callback, opts);
         }
     } else {
-        events = iteratee$$1(events, name, callback, opts);
+        events = iteratee(events, name, callback, opts);
     }
     return events;
 }
@@ -1309,22 +1340,22 @@ var ValidationError = function () {
         }
     }
 
-    ValidationError.prototype.each = function each(iteratee$$1) {
+    ValidationError.prototype.each = function each(iteratee) {
         var error = this.error;
         var nested = this.nested;
 
-        if (error) iteratee$$1(error, null);
+        if (error) iteratee(error, null);
         for (var key in nested) {
-            iteratee$$1(nested[key], key);
+            iteratee(nested[key], key);
         }
     };
 
-    ValidationError.prototype.eachError = function eachError(iteratee$$1, object) {
+    ValidationError.prototype.eachError = function eachError(iteratee, object) {
         this.each(function (value, key) {
             if (value instanceof ValidationError) {
-                value.eachError(iteratee$$1, object.get(key));
+                value.eachError(iteratee, object.get(key));
             } else {
-                iteratee$$1(value, key, object);
+                iteratee(value, key, object);
             }
         });
     };
@@ -1424,9 +1455,9 @@ var Transactional = function () {
         isRoot && transactionApi.commit(this);
     };
 
-    Transactional.prototype.updateEach = function updateEach(iteratee$$1, options) {
+    Transactional.prototype.updateEach = function updateEach(iteratee, options) {
         var isRoot = transactionApi.begin(this);
-        this.each(iteratee$$1);
+        this.each(iteratee);
         isRoot && transactionApi.commit(this);
     };
 
@@ -1458,11 +1489,11 @@ var Transactional = function () {
         return _owner ? _owner.getStore() : this._defaultStore;
     };
 
-    Transactional.prototype.map = function map(iteratee$$1, context) {
+    Transactional.prototype.map = function map(iteratee, context) {
         var arr = [],
             fun = arguments.length === 2 ? function (v, k) {
-            return iteratee$$1.call(context, v, k);
-        } : iteratee$$1;
+            return iteratee.call(context, v, k);
+        } : iteratee;
         this.each(function (val, key) {
             var result = fun(val, key);
             if (result !== void 0) arr.push(result);
@@ -1470,13 +1501,13 @@ var Transactional = function () {
         return arr;
     };
 
-    Transactional.prototype.mapObject = function mapObject(iteratee$$1, context) {
+    Transactional.prototype.mapObject = function mapObject(iteratee, context) {
         var obj = {},
             fun = arguments.length === 2 ? function (v, k) {
-            return iteratee$$1.call(context, v, k);
-        } : iteratee$$1;
+            return iteratee.call(context, v, k);
+        } : iteratee;
         this.each(function (val, key) {
-            var result = iteratee$$1(val, key);
+            var result = iteratee(val, key);
             if (result !== void 0) obj[key] = result;
         });
         return obj;
@@ -1507,10 +1538,10 @@ var Transactional = function () {
         });
     };
 
-    Transactional.prototype.eachValidationError = function eachValidationError(iteratee$$1) {
+    Transactional.prototype.eachValidationError = function eachValidationError(iteratee) {
         var validationError = this.validationError;
 
-        validationError && validationError.eachError(iteratee$$1, this);
+        validationError && validationError.eachError(iteratee, this);
     };
 
     Transactional.prototype.isValid = function isValid(key) {
@@ -1682,14 +1713,14 @@ var Record_1 = function (_Transactional) {
         this.id = x.id;
     };
 
-    Record.prototype.forEachAttr = function forEachAttr(attrs, iteratee$$1) {
+    Record.prototype.forEachAttr = function forEachAttr(attrs, iteratee) {
         var _attributes = this._attributes;
 
         var unknown = void 0;
         for (var name in attrs) {
             var spec = _attributes[name];
             if (spec) {
-                iteratee$$1(attrs[name], name, spec);
+                iteratee(attrs[name], name, spec);
             } else {
                 unknown || (unknown = []);
                 unknown.push(name);
@@ -1700,10 +1731,10 @@ var Record_1 = function (_Transactional) {
         }
     };
 
-    Record.prototype.each = function each(iteratee$$1, context) {
+    Record.prototype.each = function each(iteratee, context) {
         var fun = arguments.length === 2 ? function (v, k) {
-            return iteratee$$1.call(context, v, k);
-        } : iteratee$$1;var attributes = this.attributes;
+            return iteratee.call(context, v, k);
+        } : iteratee;var attributes = this.attributes;
         var _keys = this._keys;
 
         for (var _iterator = _keys, _isArray = Array.isArray(_iterator), _i = 0, _iterator = _isArray ? _iterator : _iterator[Symbol.iterator]();;) {
@@ -2676,12 +2707,12 @@ function createWatcherFromRef(ref, key) {
 
     var local = _ref.local;
     var resolve = _ref.resolve;
-    var tail$$1 = _ref.tail;
+    var tail = _ref.tail;
 
     return local ? function (record, value) {
-        record[tail$$1](value, key);
+        record[tail](value, key);
     } : function (record, value) {
-        resolve(record)[tail$$1](value, key);
+        resolve(record)[tail](value, key);
     };
 }
 function createForEach(attrSpecs) {
@@ -3397,10 +3428,10 @@ var Collection_1 = function (_Transactional) {
         }
     };
 
-    Collection.prototype.each = function each(iteratee$$1, context) {
+    Collection.prototype.each = function each(iteratee, context) {
         var fun = arguments.length === 2 ? function (v, k) {
-            return iteratee$$1.call(context, v, k);
-        } : iteratee$$1;var models = this.models;
+            return iteratee.call(context, v, k);
+        } : iteratee;var models = this.models;
 
         for (var i = 0; i < models.length; i++) {
             fun(models[i], i);
@@ -3922,7 +3953,6 @@ var Store = function (_Record) {
 }(Record);
 Store.global = new Store();
 
-//import * as _ from 'underscore'
 var slice$2 = Array.prototype.slice;
 
 var UnderscoreModel = {
@@ -3931,13 +3961,13 @@ var UnderscoreModel = {
             args[_key] = arguments[_key];
         }
 
-        return pick$1(this, args);
+        return _pick(this, args);
     },
     escape: function escape(attr) {
-        return escape$1(this[attr]);
+        return _escape(this[attr]);
     },
     matches: function matches(attrs) {
-        return !!iteratee(attrs, this)(this);
+        return !!_iteratee(attrs, this)(this);
     },
     omit: function omit() {
         for (var _len2 = arguments.length, keys = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
@@ -3982,58 +4012,58 @@ var UnderscoreCollection = {
 };
 
 addUnderscoreMethods(UnderscoreCollection, 'models', {
-    forEach: { l: 3, m: forEach },
+    forEach: { l: 3, m: _forEach },
     //  each : { l:3, m: each},
-    map: { l: 3, m: map$1 },
+    map: { l: 3, m: _map },
     //  collect : { l:3, m: collect},
-    reduce: { l: 4, m: reduce },
+    reduce: { l: 4, m: _reduce },
     //  foldl    : { l:4, m: foldl},
     //  inject : { l:4, m: inject},
     //  reduceRight : { l:4, m: reduceRight},
     //  foldr : { l:4, m: foldr},
-    find: { l: 3, m: find },
-    findIndex: { l: 3, m: findIndex },
-    findLastIndex: { l: 3, m: findLastIndex },
+    find: { l: 3, m: _find },
+    findIndex: { l: 3, m: _findIndex },
+    findLastIndex: { l: 3, m: _findLastIndex },
     //  detect : { l:3, m: detect},
-    filter: { l: 3, m: filter },
+    filter: { l: 3, m: _filter },
     //  select   : { l:3, m: select},
     //  reject : { l:3, m: reject},
-    every: { l: 3, m: every$1 },
+    every: { l: 3, m: _every },
     //  all : { l:3, m:all },
-    some: { l: 3, m: some$1 },
+    some: { l: 3, m: _some },
     //  any : { l:3, m:any },
     //  include : { l:3, m:include },
-    includes: { l: 3, m: includes },
+    includes: { l: 3, m: _includes },
     //  contains : { l:3, m:contains },
-    invoke: { l: 0, m: invoke },
-    max: { l: 3, m: max },
-    min: { l: 3, m: min },
-    toArray: { l: 1, m: toArray },
+    invoke: { l: 0, m: _invoke },
+    max: { l: 3, m: _max },
+    min: { l: 3, m: _min },
+    toArray: { l: 1, m: _toArray },
     //  size : { l:1, m:size },
     //  first : { l:3, m:first },
-    head: { l: 3, m: head },
+    head: { l: 3, m: _head },
     //  take : { l:3, m:take },
     //  initial : { l:3, m:initial },
     //  rest : { l:3, m:rest },
-    tail: { l: 3, m: tail },
+    tail: { l: 3, m: _tail },
     //  drop : { l:3, m:drop },
-    last: { l: 3, m: last$1 },
-    without: { l: 0, m: without },
-    difference: { l: 0, m: difference },
-    indexOf: { l: 3, m: indexOf$1 },
+    last: { l: 3, m: _last },
+    without: { l: 0, m: _without },
+    difference: { l: 0, m: _difference },
+    indexOf: { l: 3, m: _indexOf },
     //  shuffle : { l:1, m: shuffle},
-    lastIndexOf: { l: 3, m: lastIndexOf },
-    isEmpty: { l: 1, m: isEmpty },
+    lastIndexOf: { l: 3, m: _lastIndexOf },
+    isEmpty: { l: 1, m: _isEmpty },
     //  chain : { l:1, m:chain },
-    sample: { l: 3, m: sample },
-    partition: { l: 3, m: partition },
-    groupBy: { l: 3, m: groupBy },
-    countBy: { l: 3, m: countBy },
-    sortBy: { l: 3, m: sortBy }
+    sample: { l: 3, m: _sample },
+    partition: { l: 3, m: _partition },
+    groupBy: { l: 3, m: _groupBy },
+    countBy: { l: 3, m: _countBy },
+    sortBy: { l: 3, m: _sortBy }
 });
 
 function addUnderscoreMethods(Mixin, attribute, methods) {
-    each$1(methods, function (_ref, methodName) {
+    _each(methods, function (_ref, methodName) {
         var l = _ref.l;
         var m = _ref.m;
 
@@ -4059,16 +4089,16 @@ function addMethod(length, method, attribute) {
                 return method(this[attribute], value);
             };
         case 3:
-            return function (iteratee$$1, context) {
+            return function (iteratee, context) {
                 var value = this[attribute],
-                    callback = cb(iteratee$$1, this);
+                    callback = cb(iteratee, this);
 
                 return arguments.length > 1 ? method(value, callback, context) : method(value, callback);
             };
         case 4:
-            return function (iteratee$$1, defaultVal, context) {
+            return function (iteratee, defaultVal, context) {
                 var value = this[attribute],
-                    callback = cb(iteratee$$1, this);
+                    callback = cb(iteratee, this);
 
                 return arguments.length > 1 ? method(value, callback, defaultVal, context) : method(value, callback);
             };
@@ -4082,19 +4112,19 @@ function addMethod(length, method, attribute) {
 }
 
 // Support `collection.sortBy('attr')` and `collection.findWhere({id: 1})`.
-function cb(iteratee$$1, instance) {
-    switch (typeof iteratee$$1 === 'undefined' ? 'undefined' : _typeof(iteratee$$1)) {
+function cb(iteratee, instance) {
+    switch (typeof iteratee === 'undefined' ? 'undefined' : _typeof(iteratee)) {
         case 'function':
-            return iteratee$$1;
+            return iteratee;
         case 'string':
             return function (model) {
-                return model.get(iteratee$$1);
+                return model.get(iteratee);
             };
         case 'object':
-            if (!(iteratee$$1 instanceof instance.model)) return matches(iteratee$$1);
+            if (!(iteratee instanceof instance.model)) return _matches(iteratee);
     }
 
-    return iteratee$$1;
+    return iteratee;
 }
 
 /**

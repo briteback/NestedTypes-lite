@@ -8,5 +8,8 @@
       }
     ]
   ],
-  "plugins": ["external-helpers"]
+  "plugins": [
+    "external-helpers",
+    "lodash"
+  ]
 }
