@@ -1,7 +1,7 @@
 /**
  * Prepare backbone View, Router, History, and Events.
  */
-import { Mixable, Model, Collection, Events, define, tools } from '../dist/index.js'
+import { Mixable, Model, Collection, Events, define, tools, mergeProps } from '../dist/index.js'
 //export = Nested;
 //import * as Backbone from './backbone'
 //import { RestCollection, RestModel } from './rest'
@@ -57,4 +57,4 @@ function linkProperty( Namespace, name ){
     };
 }
 
-export { Mixable, Model, Collection, Events, define, tools };
+export { Mixable, Model, Collection, Events, define, tools, mergeProps };

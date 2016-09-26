@@ -4113,4 +4113,4 @@ Mixable.mixins(Events);
 Record.mixins(UnderscoreModel);
 Collection.mixins(UnderscoreCollection);
 
-export { Mixable, Record as Model, Collection, Events, define, tools };
+export { Mixable, Record as Model, Collection, Events, define, tools, mergeProps };
