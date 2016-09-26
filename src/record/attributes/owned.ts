@@ -1,7 +1,7 @@
-import { Record } from '../transaction' 
+import { Record } from '../transaction'
 import { GenericAttribute } from './generic'
 import { Owner, transactionApi, Transactional, TransactionOptions, TransactionalConstructor } from '../../transactions'
-import { tools } from '../../object-plus' 
+import { tools } from '../../object-plus/index'
 
 const { free, aquire } = transactionApi;
 
@@ -24,7 +24,7 @@ export class TransactionalType extends GenericAttribute {
     convert( value : any, options : TransactionOptions, prev : any, record : Record ) : Transactional {
         // Invoke class factory to handle abstract classes
         if( value == null ) return value;
-        
+
         if( value instanceof this.type ){
             if( value._shared === 1 ){
                 tools.log.warn( `[Record] Aggregated attribute "${ this.name } : ${ (<any>this.type).name || 'Collection' }" is assigned with shared collection type.`, value, record._attributes );
@@ -51,7 +51,7 @@ export class TransactionalType extends GenericAttribute {
 
     _handleChange( next : Transactional, prev : Transactional, record : Record ){
         prev && free( record, prev );
-        
+
         if( next && !aquire( record, next, this.name ) ){
             tools.log.warn( `[Record] aggregated '${this.name}' attribute value already has an owner.`, next, record._attributes );
         }

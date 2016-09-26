@@ -1,8 +1,8 @@
-import { define, tools, eventsApi, EventMap, EventsDefinition, Mixable } from '../object-plus'
+import { define, tools, eventsApi, EventMap, EventsDefinition, Mixable } from '../object-plus/index'
 import { transactionApi, Transactional, CloneOptions, Transaction, TransactionOptions, TransactionalDefinition, Owner } from '../transactions'
-import { Record, SharedRecordType, TransactionalType, createSharedTypeSpec } from '../record'
+import { Record, SharedRecordType, TransactionalType, createSharedTypeSpec } from '../record/index'
 
-import { IdIndex, sortElements, dispose, Elements, CollectionCore, addIndex, removeIndex, Comparator, CollectionTransaction } from './commons'
+import { IdIndex, sortElements, dispose, Elements, CollectionCore, addIndex, removeIndex, Comparator, CollectionTransaction } from './commons/'
 import { addTransaction } from './add'
 import { setTransaction, emptySetTransaction } from './set'
 import { removeOne, removeMany } from './remove'
@@ -15,7 +15,7 @@ let _count = 0;
 
 const silentOptions = { silent : true };
 
-export type GenericComparator = string | ( ( x : Record ) => number ) | ( ( a : Record, b : Record ) => number ); 
+export type GenericComparator = string | ( ( x : Record ) => number ) | ( ( a : Record, b : Record ) => number );
 
 
 export interface CollectionOptions extends TransactionOptions {
@@ -30,7 +30,7 @@ interface CollectionDefinition extends TransactionalDefinition {
 }
 
 @define({
-    // Default client id prefix 
+    // Default client id prefix
     cidPrefix : 'c',
     model : Record,
     _changeEventName : 'changes',
@@ -43,11 +43,11 @@ export class Collection extends Transactional implements CollectionCore {
     static Subset : typeof Collection
     static Set : typeof Collection
     static _SubsetOf : typeof Collection
-    
+
     createSubset( models, options ){
         const SubsetOf = (<any>this.constructor).subsetOf( this ).options.type,
             subset   = new SubsetOf( models, options );
-            
+
         subset.resolve( this );
         return subset;
     }
@@ -62,7 +62,7 @@ export class Collection extends Transactional implements CollectionCore {
         }
 
         Mixable.mixTo( Subset );
-        
+
         Subset.prototype = this.prototype;
         Subset._attribute = TransactionalType;
         Subset[ 'of' ] = function( path ){
@@ -75,12 +75,12 @@ export class Collection extends Transactional implements CollectionCore {
         createSharedTypeSpec( this, SharedCollectionType );
         return this;
     }
-    
+
     static define( protoProps : CollectionDefinition = {}, staticProps? ){
                 // Extract record definition from static members, if any.
         const   staticsDefinition : CollectionDefinition = tools.getChangedStatics( this, 'model', 'itemEvents' ),
                 // Definition can be made either through statics or define argument.
-                // Merge them together, so we won't care about it below. 
+                // Merge them together, so we won't care about it below.
                 definition = assign( staticsDefinition, protoProps );
 
         const spec : CollectionDefinition = omit( definition, 'itemEvents' );
@@ -88,14 +88,14 @@ export class Collection extends Transactional implements CollectionCore {
         if( definition.itemEvents ){
             const eventsMap = new EventMap( this.prototype._itemEvents );
             eventsMap.addEventsMap( definition.itemEvents );
-            spec._itemEvents = eventsMap; 
+            spec._itemEvents = eventsMap;
         }
 
         return Transactional.define.call( this, spec, staticProps );
     }
 
     static subsetOf : ( collectionReference : any ) => any;
-    
+
     _itemEvents : EventMap
 
     /***********************************
@@ -119,7 +119,7 @@ export class Collection extends Transactional implements CollectionCore {
                     const aa = a[ <string>x ], bb = b[ <string>x ];
                     if( aa === bb ) return 0;
                     return aa < bb ? -1 : + 1;
-                } 
+                }
                 break;
             case 'function' :
                 if( x.length === 1 ){
@@ -133,12 +133,12 @@ export class Collection extends Transactional implements CollectionCore {
                     this._comparator = ( a, b ) => (<any>x).call( this, a, b );
                 }
                 break;
-                
+
             default :
                 this._comparator = null;
         }
     }
-    
+
     // TODO: Improve typing
     getStore() : Transactional {
         return this._store || ( this._store = this._owner ? this._owner.getStore() : this._defaultStore );
@@ -178,7 +178,7 @@ export class Collection extends Transactional implements CollectionCore {
         }
         else{
             return this._byId[ objOrId ];
-        }        
+        }
     }
 
     each( iteratee : ( val : Record, key : number ) => void, context? : any ){
@@ -186,7 +186,7 @@ export class Collection extends Transactional implements CollectionCore {
             { models } = this;
 
         for( let i = 0; i < models.length; i++ ){
-            fun( models[ i ], i ); 
+            fun( models[ i ], i );
         }
     }
 
@@ -216,16 +216,16 @@ export class Collection extends Transactional implements CollectionCore {
         super( _count++ );
         this.models = [];
         this._byId = {};
-        
+
         this.comparator  = this.comparator;
 
         if( options.comparator !== void 0 ){
             this.comparator = options.comparator;
             options.comparator = void 0;
         }
-        
+
         this.model       = this.model;
-        
+
         if( options.model ){
             this.model = options.model;
             options.model = void 0;
@@ -251,7 +251,7 @@ export class Collection extends Transactional implements CollectionCore {
     first() : Record { return this.models[ 0 ]; }
     last() : Record { return this.models[ this.models.length - 1 ]; }
     at( a_index : number ) : Record {
-        const index = a_index < 0 ? a_index + this.models.length : a_index;    
+        const index = a_index < 0 ? a_index + this.models.length : a_index;
         return this.models[ index ];
     }
 
@@ -259,9 +259,9 @@ export class Collection extends Transactional implements CollectionCore {
     clone( options : CloneOptions = {} ) : this {
         const models = this.map( model => model.clone() ),
               copy : this = new (<any>this.constructor)( models, { model : this.model, comparator : this.comparator }, this._shared );
-        
+
         if( options.pinStore ) copy._defaultStore = this.getStore();
-        
+
         return copy;
     }
 
@@ -272,7 +272,7 @@ export class Collection extends Transactional implements CollectionCore {
         }
     }
 
-    // Apply bulk in-place object update in scope of ad-hoc transaction 
+    // Apply bulk in-place object update in scope of ad-hoc transaction
     set( elements : ElementsArg = [], options : TransactionOptions = {} ) : this {
         if( (<any>options).add !== void 0 ){
             log.error("Collection.set doesn't support 'add' option, behaving as if options.add === true.");
@@ -285,9 +285,9 @@ export class Collection extends Transactional implements CollectionCore {
         else{
             const transaction = this._createTransaction( elements, options );
             transaction && transaction.commit();
-        } 
+        }
 
-        return this;    
+        return this;
     }
 
     dispose(){
@@ -305,7 +305,7 @@ export class Collection extends Transactional implements CollectionCore {
               previousModels = dispose( this );
 
         // Make all changes required, but be silent.
-        if( a_elements ){            
+        if( a_elements ){
             emptySetTransaction( this, toElements( this, a_elements, options ), options, true );
         }
 
@@ -327,10 +327,10 @@ export class Collection extends Transactional implements CollectionCore {
         if( transaction ){
             transaction.commit();
             return transaction.added;
-        } 
+        }
     }
 
-    // Remove elements. 
+    // Remove elements.
     remove( recordsOrIds : any, options : TransactionOptions = {} ) : Record[] | Record {
         if( recordsOrIds ){
             return Array.isArray( recordsOrIds ) ?
@@ -342,7 +342,7 @@ export class Collection extends Transactional implements CollectionCore {
     }
 
     // Apply bulk object update without any notifications, and return open transaction.
-    // Used internally to implement two-phase commit.   
+    // Used internally to implement two-phase commit.
     _createTransaction( a_elements : ElementsArg, options : TransactionOptions = {} ) : CollectionTransaction {
         const elements = toElements( this, a_elements, options );
 
@@ -369,7 +369,7 @@ export class Collection extends Transactional implements CollectionCore {
     sort( options : TransactionOptions = {} ) : this {
         if( sortElements( this, options ) ){
             const isRoot = begin( this );
-            
+
             if( markAsDirty( this, options ) ){
                 trigger2( this, 'sort', this, options );
             }
@@ -440,7 +440,7 @@ type ElementsArg = Object | Record | Object[] | Record[];
 
 // TODO: make is safe for parse to return null (?)
 function toElements( collection : Collection, elements : ElementsArg, options : CollectionOptions ) : Elements {
-    const parsed = options.parse ? collection.parse( elements, options ) : elements; 
+    const parsed = options.parse ? collection.parse( elements, options ) : elements;
     return Array.isArray( parsed ) ? parsed : [ parsed ];
 }
 

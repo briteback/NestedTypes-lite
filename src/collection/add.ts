@@ -1,11 +1,11 @@
 import { Transaction, transactionApi } from '../transactions'
 import { CollectionTransaction, logAggregationError, sortElements, convertAndAquire, free, CollectionOptions, addIndex, CollectionCore } from './commons'
-import { Record } from '../record'
+import { Record } from '../record/index'
 
 const { begin, commit, markAsDirty } = transactionApi;
 
 interface AddOptions extends CollectionOptions {
-    at? : number 
+    at? : number
 }
 
 /** @private */
@@ -29,13 +29,13 @@ export function addTransaction( collection : CollectionCore, items, options : Ad
 };
 
 // Handle sort or insert at options for add operation. Reurns true if sort happened.
-/** @private */ 
+/** @private */
 function sortOrMoveElements( collection : CollectionCore, added : Record[], options : AddOptions ) : boolean {
     let at = options.at;
 
     // if `at` option is given, it overrides sorting option...
     if( at != null ){
-        // Take an original collection's length. 
+        // Take an original collection's length.
         const length = collection.models.length - added.length;
 
         // Crazy Backbone rules about `at` index. I don't know what that guys smoke.

@@ -1,6 +1,6 @@
-import { GenericAttribute } from './attributes';
+import { GenericAttribute } from './attributes/index';
 import { Attribute, AttributesValues, AttributeDescriptorMap, CloneAttributesCtor } from './transaction'
-import { tools, eventsApi } from '../object-plus'
+import { tools, eventsApi } from '../object-plus/index'
 import { toAttributeDescriptor } from './typespec'
 import { CompiledReference } from '../traversable'
 
@@ -42,7 +42,7 @@ export function compile( rawSpecs : AttributeDescriptorMap, baseAttributes : Att
             _attributes : new Attributes( allAttributes ),
             properties : transform( <PropertyDescriptorMap>{}, myAttributes, x => x.createPropertyDescriptor() ),
             defaults : createDefaults( allAttributes ),
-            _toJSON : createToJSON( allAttributes ), // <- TODO: profile and check if there is any real benefit. I doubt it. 
+            _toJSON : createToJSON( allAttributes ), // <- TODO: profile and check if there is any real benefit. I doubt it.
             _localEvents : createEventMap( myAttributes ),
             _keys : Object.keys( allAttributes )
          };
@@ -73,14 +73,14 @@ function createEventMap( attrSpecs : AttributesSpec ) : eventsApi.EventMap {
 
     for( var key in attrSpecs ){
         const attribute = attrSpecs[ key ],
-            { _onChange } = attribute.options; 
+            { _onChange } = attribute.options;
 
         if( _onChange ){
             events || ( events = new EventMap() );
 
             events.addEvent( 'change:' + key,
                 typeof _onChange === 'string' ?
-                    createWatcherFromRef( _onChange, key ) : 
+                    createWatcherFromRef( _onChange, key ) :
                     wrapWatcher( _onChange, key ) );
         }
     }
@@ -92,7 +92,7 @@ function createEventMap( attrSpecs : AttributesSpec ) : eventsApi.EventMap {
 function wrapWatcher( watcher, key ){
     return function( record, value ){
         watcher.call( record, value, key );
-    } 
+    }
 }
 
 /** @private */

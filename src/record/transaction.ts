@@ -1,9 +1,9 @@
 /**
  * Record core implementing transactional updates.
- * The root of all definitions. 
+ * The root of all definitions.
  */
 
-import { tools, eventsApi, Mixable, ClassDefinition, Constructor, define } from '../object-plus'
+import { tools, eventsApi, Mixable, ClassDefinition, Constructor, define } from '../object-plus/index'
 
 import { transactionApi, CloneOptions, Transactional, Transaction, TransactionOptions, Owner } from '../transactions'
 import { ChildrenErrors } from '../validation'
@@ -34,7 +34,7 @@ export interface AttributeDescriptor {
 
     parse? : AttributeParse
     toJSON? : AttributeToJSON
-   
+
     getHooks? : GetHook[]
     transforms? : Transform[]
     changeHandlers? : ChangeHandler[]
@@ -55,7 +55,7 @@ export type AttributeParse = ( value : any, key : string ) => any
  * Attribute definitions
  */
 export interface AttributesValues {
-    id? : string | number 
+    id? : string | number
     [ key : string ] : any
 }
 
@@ -96,7 +96,7 @@ interface ConstructorOptions extends TransactionOptions{
 let _cidCounter : number = 0;
 
 @define({
-    // Default client id prefix 
+    // Default client id prefix
     cidPrefix : 'm',
 
     // Name of the change event
@@ -116,20 +116,20 @@ export class Record extends Transactional implements Owner {
     static Collection : typeof Transactional
 
     static from : ( collectionReference : any ) => any;
-    
+
     static defaults( attrs : AttributeDescriptorMap ){
         return this.extend({ attributes : attrs });
     }
-    
+
     /***********************************
      * Core Members
      */
     // Previous attributes
     _previousAttributes : {}
 
-    previousAttributes(){ return new this.Attributes( this._previousAttributes ); } 
+    previousAttributes(){ return new this.Attributes( this._previousAttributes ); }
 
-    // Current attributes    
+    // Current attributes
     attributes : AttributesValues
 
     // Polymorphic accessor for aggregated attribute's canBeUpdated().
@@ -158,7 +158,7 @@ export class Record extends Transactional implements Owner {
             this._changedAttributes = changed;
         }
 
-        return changed;    
+        return changed;
     }
 
     changedAttributes( diff? : {} ) : boolean | {} {
@@ -173,7 +173,7 @@ export class Record extends Transactional implements Owner {
             (changed || (changed = {}))[ attr ] = val;
         }
 
-        return changed;        
+        return changed;
     }
 
     hasChanged( key? : string ) : boolean {
@@ -190,7 +190,7 @@ export class Record extends Transactional implements Owner {
             const { _previousAttributes } = this;
             if( _previousAttributes ) return _previousAttributes[ key ];
         }
-        
+
         return null;
     }
 
@@ -204,7 +204,7 @@ export class Record extends Transactional implements Owner {
 
     unset( key, options? ) : this {
         this.set( key, void 0, options );
-        return this; 
+        return this;
     }
 
     clear( options? ) : this {
@@ -241,12 +241,12 @@ export class Record extends Transactional implements Owner {
      * Dynamically compiled stuff
      */
 
-    // Attributes specifications 
+    // Attributes specifications
     _attributes : AttributesSpec
 
     // Attribute keys
     _keys : string[]
-    
+
     // Attributes object copy constructor
 //    Attributes : CloneAttributesCtor
     Attributes( x : AttributesValues ) : void { this.id = x.id; }
@@ -276,7 +276,7 @@ export class Record extends Transactional implements Owner {
         // TODO: try this versus object traversal.
         /*
         const { _attributes, _keys } = this;
-        
+
         for( let name of _keys ){
             const spec = _attributes[ name ],
                   value = attrs[ name ];
@@ -311,13 +311,13 @@ export class Record extends Transactional implements Owner {
     constructor( a_values? : {}, a_options? : ConstructorOptions ){
         super( _cidCounter++ );
         this.attributes = {};
-        
+
         const options = a_options || {},
               values = ( options.parse ? this.parse( a_values, options ) :  a_values ) || {};
 
         // TODO: type error for wrong object.
 
-        const attributes = options.clone ? cloneAttributes( this, values ) : this.defaults( values ); 
+        const attributes = options.clone ? cloneAttributes( this, values ) : this.defaults( values );
 
         this.forEachAttr( attributes, ( value : any, key : string, attr : AttributeUpdatePipeline ) => {
             const next = attributes[ key ] = attr.transform( value, options, void 0, this );
@@ -331,13 +331,13 @@ export class Record extends Transactional implements Owner {
         if( this._localEvents ) this._localEvents.subscribe( this, this );
     }
 
-    // Initialization callback, to be overriden by the subclasses 
+    // Initialization callback, to be overriden by the subclasses
     initialize( values?, options? ){}
 
     // Deeply clone record, optionally setting new owner.
     clone( options : CloneOptions = {} ) : this {
         const copy : this = new (<any>this.constructor)( this.attributes, { clone : true } );
-        
+
         if( options.pinStore ) copy._defaultStore = this.getStore();
 
         return copy;
@@ -371,7 +371,7 @@ export class Record extends Transactional implements Owner {
      * Serialization control
      */
 
-    // Default record-level serializer, to be overriden by subclasses 
+    // Default record-level serializer, to be overriden by subclasses
     toJSON() : Object {
         const json = {};
 
@@ -382,13 +382,13 @@ export class Record extends Transactional implements Owner {
                 const asJson = toJSON.call( this, value, key );
 
                 // ...skipping undefined values. Such an attributes are excluded.
-                if( asJson !== void 0 ) json[ key ] = asJson; 
+                if( asJson !== void 0 ) json[ key ] = asJson;
             }
         });
 
         return json;
     }
-    
+
     // Default record-level parser, to be overriden by the subclasses.
     parse( data, options? : TransactionOptions ){
         // Call dynamically compiled loop-unrolled attribute-level parse function.
@@ -410,7 +410,7 @@ export class Record extends Transactional implements Owner {
             else{
                 setAttribute( this, a, b );
                 return this;
-            } 
+            }
         }
         else{
             return <this> super.set( a, b );
@@ -450,7 +450,7 @@ export class Record extends Transactional implements Owner {
                     // Silently fail in other case.
                     else return;
                 }
-                
+
                 model = next;
             }
 
@@ -466,13 +466,13 @@ export class Record extends Transactional implements Owner {
         return this;
     }
 
-    // Need to override it here, since begin/end transaction brackets are overriden. 
+    // Need to override it here, since begin/end transaction brackets are overriden.
     transaction( fun : ( self : this ) => void, options : TransactionOptions = {} ) : void{
         const isRoot = begin( this );
         fun.call( this, this );
         isRoot && commit( this );
     }
-    
+
     // Create transaction. TODO: Move to transaction constructor
     _createTransaction( a_values : {}, options : TransactionOptions = {} ) : Transaction {
         const isRoot = begin( this ),
@@ -501,7 +501,7 @@ export class Record extends Transactional implements Owner {
                 const next = attr.transform( value, options, prev, this );
                 attributes[ key ] = next;
 
-                if( attr.isChanged( next, prev ) ) {    
+                if( attr.isChanged( next, prev ) ) {
                     changes.push( key );
 
                     // Do the rest of the job after assignment
@@ -516,7 +516,7 @@ export class Record extends Transactional implements Owner {
         if( ( nested.length || changes.length ) && markAsDirty( this, options ) ){
             return new RecordTransaction( this, isRoot, nested, changes );
         }
-        
+
         // No changes
         isRoot && commit( this );
     }
@@ -524,11 +524,11 @@ export class Record extends Transactional implements Owner {
     // Handle nested changes. TODO: propagateChanges == false, same in transaction.
     _onChildrenChange( child : Transactional, options : TransactionOptions ) : void {
         const { _ownerKey } = child,
-              attribute = this._attributes[ _ownerKey ];        
+              attribute = this._attributes[ _ownerKey ];
         if( !attribute || attribute.propagateChanges ) this.forceAttributeChange( _ownerKey, options );
     }
 
-    // Simulate attribute change 
+    // Simulate attribute change
     forceAttributeChange( key : string, options : TransactionOptions = {} ){
         // Touch an attribute in bounds of transaction
         const isRoot = begin( this );
@@ -536,7 +536,7 @@ export class Record extends Transactional implements Owner {
         if( markAsDirty( this, options ) ){
             trigger3( this, 'change:' + key, this, this.attributes[ key ], options );
         }
-        
+
         isRoot && commit( this );
     }
 
@@ -549,7 +549,7 @@ export class Record extends Transactional implements Owner {
     dispose(){
         this.forEachAttr( this.attributes, ( value, key ) => {
             if( value && this === value._owner ){
-                value.dispose(); 
+                value.dispose();
             }
         });
 
@@ -567,7 +567,7 @@ function begin( record : Record ){
         record._changedAttributes = null;
         return true;
     }
-    
+
     return false;
 }
 
@@ -592,7 +592,7 @@ function cloneAttributes( record : Record, a_attributes : AttributesValues ) : A
 }
 
  // Optimized single attribute transactional update. To be called from attributes setters
- // options.silent === false, parse === false. 
+ // options.silent === false, parse === false.
 export function setAttribute( record : Record, name : string, value : any ) : void {
     const isRoot  = begin( record ),
           options = {},
@@ -629,8 +629,8 @@ export function setAttribute( record : Record, name : string, value : any ) : vo
     isRoot && commit( record );
 }
 
-// Transaction class. Implements two-phase transactions on object's tree. 
-// Transaction must be created if there are actual changes and when markIsDirty returns true. 
+// Transaction class. Implements two-phase transactions on object's tree.
+// Transaction must be created if there are actual changes and when markIsDirty returns true.
 class RecordTransaction implements Transaction {
     // open transaction
     constructor( public object : Record,
@@ -643,7 +643,7 @@ class RecordTransaction implements Transaction {
         const { nested, object, changes } = this;
 
         // Commit all pending nested transactions...
-        for( let transaction of nested ){ 
+        for( let transaction of nested ){
             transaction.commit( true );
         }
 

@@ -1,17 +1,17 @@
 /*************
  * Remove items from collections.
- * 
+ *
  * Cannot be a part of two-phase transaction on object tree.
  * Can be executed in the scope of ad-hoc transaction or from the trigger, though.
  *
- * Implemented with low-level API. 
+ * Implemented with low-level API.
  * Most frequent operation - single element remove. Thus, it have the fast-path.
  */
 
-import { Record } from '../record'
+import { Record } from '../record/index'
 import { free, CollectionCore, CollectionTransaction, removeIndex } from './commons'
-import { eventsApi } from '../object-plus'
-import { TransactionOptions, transactionApi } from '../transactions' 
+import { eventsApi } from '../object-plus/index'
+import { TransactionOptions, transactionApi } from '../transactions'
 
 const { trigger2, trigger3 } = eventsApi,
     { markAsDirty, begin, commit } = transactionApi;
@@ -24,18 +24,18 @@ export function removeOne( collection : CollectionCore, el : Record | {} | strin
         const isRoot = begin( collection ),
               models = collection.models;
 
-        // Remove model form the collection. 
+        // Remove model form the collection.
         models.splice( models.indexOf( model ), 1 );
         removeIndex( collection._byId, model );
-        
-        // Mark transaction as dirty. 
+
+        // Mark transaction as dirty.
         const notify = markAsDirty( collection, options );
 
         // Send out events.
         if( notify ){
             trigger3( model, 'remove', model, collection, options );
             trigger3( collection, 'remove', model, collection, options );
-        } 
+        }
 
         free( collection, model );
 

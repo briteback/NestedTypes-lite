@@ -1,5 +1,5 @@
 import { GenericAttribute } from './generic'
-import { tools } from '../../object-plus'
+import { tools } from '../../object-plus/index'
 
 // Default attribute type for all constructor functions...
 /** @private */
@@ -37,15 +37,15 @@ export class PrimitiveType extends GenericAttribute {
 Boolean._attribute = String._attribute = PrimitiveType;
 
 // Number type with special validation algothim.
-/** @private */ 
+/** @private */
 export class NumericType extends PrimitiveType {
     type : NumberConstructor
 
     convert( value ) {
-        const num = value == null ? value : this.type( value );        
+        const num = value == null ? value : this.type( value );
 
         if( num !== num ) logInvalidNumber( this, value, arguments[ 3 ] );
-        
+
         return num;
     }
 
@@ -66,7 +66,7 @@ Number._attribute = NumericType;
 /**
  * Compatibility wrapper for Array type.
  * @private
- */ 
+ */
 export class ArrayType extends GenericAttribute {
     toJSON( value ) { return value; }
 

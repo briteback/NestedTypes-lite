@@ -1,16 +1,16 @@
-import { GenericAttribute, AttributeDescriptor } from '../record'
+import { GenericAttribute, AttributeDescriptor } from '../record/index'
 import { parseReference, CollectionReference } from './commons'
-import { Collection } from '../collection'
-import { Record } from '../record'
+import { Collection } from '../collection/index'
+import { Record } from '../record/index'
 
-import { ChainableAttributeSpec } from '../record'
+import { ChainableAttributeSpec } from '../record/index'
 
 /********
  * Reference to model by id.
- * 
+ *
  * Untyped attribute. Holds model id, when unresolved. When resolved, is substituted
  * with a real model.
- * 
+ *
  * No model changes are detected and counted as owner's change. That's intentional.
  */
 
@@ -19,12 +19,12 @@ type RecordRefValue = Record | string;
 
 /** @private */
 class RecordRefAttribute extends GenericAttribute {
-    // It is always serialized as an id, whenever it's resolved or not. 
+    // It is always serialized as an id, whenever it's resolved or not.
     toJSON( value : RecordRefValue ){
         return value && typeof value === 'object' ? value.id : value;
     }
 
-    // Wne 
+    // Wne
     clone( value : RecordRefValue ){
         return value && typeof value === 'object' ? value.id : value;
     }
@@ -48,7 +48,7 @@ Record.from = function from( masterCollection : CollectionReference ) : Chainabl
         value : null,
         _attribute : RecordRefAttribute
     });
-    
+
     typeSpec
         .get( function( objOrId : RecordRefValue, name : string ) : Record {
             if( typeof objOrId === 'object' ) return objOrId;

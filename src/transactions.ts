@@ -1,11 +1,11 @@
-import { Messenger, Listeners, ListeningToMap, MixinRules, MessengerDefinition, tools, extendable, mixins, eventsApi, define, Constructor, MixableConstructor } from './object-plus'
+import { Messenger, Listeners, ListeningToMap, MixinRules, MessengerDefinition, tools, extendable, mixins, eventsApi, define, Constructor, MixableConstructor } from './object-plus/index'
 import { ValidationError, Validatable, ChildrenErrors } from './validation'
 import { Traversable, resolveReference } from './traversable'
 
 const { assign } = tools,
       { trigger2, trigger3, on, off } = eventsApi;
 /***
- * Abstract class implementing ownership tree, tho-phase transactions, and validation. 
+ * Abstract class implementing ownership tree, tho-phase transactions, and validation.
  * 1. createTransaction() - apply changes to an object tree, and if there are some events to send, transaction object is created.
  * 2. transaction.commit() - send and process all change events, and close transaction.
  */
@@ -33,12 +33,12 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     off : (name? : string, callback? : Function, context? ) => this
     stopListening : ( obj? : Messenger, name? : string, callback? : Function ) => this
     listenTo : (obj : Messenger, name, callback? ) => this
-    once : (name, callback, context) => this 
-    listenToOnce : (obj : Messenger, name, callback) => this 
+    once : (name, callback, context) => this
+    listenToOnce : (obj : Messenger, name, callback) => this
     trigger      : (name : string, a?, b?, c? ) => this
-    
+
     _disposed : boolean;
-    
+
     dispose() : void {
         this._owner = void 0;
         this._ownerKey = void 0;
@@ -51,7 +51,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
 
     /** @private */
     _events : eventsApi.EventsSubscription = void 0;
-    
+
     /** @private */
     _listeners : Listeners
 
@@ -84,7 +84,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
 
     // Key supplied by owner. Used by record to identify attribute key.
     // Only collections doesn't set the key, which is used to distinguish collections.
-    /** @private */  
+    /** @private */
     _ownerKey : string = void 0;
 
     // Name of the change event
@@ -106,7 +106,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     }
 
     /**
-     * Listen to changes event. 
+     * Listen to changes event.
      */
     listenToChanges( target : Transactional, handler ){
         this.listenTo( target, target._changeEventName, handler );
@@ -118,7 +118,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
 
     // Deeply clone ownership subtree
     abstract clone( options? : CloneOptions ) : this
-    
+
     // Execute given function in the scope of ad-hoc transaction.
     transaction( fun : ( self : this ) => void, options : TransactionOptions = {} ) : void{
         const isRoot = transactionApi.begin( this );
@@ -134,12 +134,12 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
         isRoot && transactionApi.commit( this );
     }
 
-    // Apply bulk in-place object update in scope of ad-hoc transaction 
+    // Apply bulk in-place object update in scope of ad-hoc transaction
     set( values : any, options? : TransactionOptions ) : this {
-        if( values ){ 
+        if( values ){
             const transaction = this._createTransaction( values, options );
             transaction && transaction.commit();
-        } 
+        }
 
         return this;
     }
@@ -147,9 +147,9 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     // Apply bulk object update without any notifications, and return open transaction.
     // Used internally to implement two-phase commit.
     // Returns null if there are no any changes.
-    /** @private */  
+    /** @private */
     abstract _createTransaction( values : any, options? : TransactionOptions ) : Transaction
-    
+
     // Parse function applied when 'parse' option is set for transaction.
     parse( data : any, options? : TransactionOptions ) : any { return data }
 
@@ -159,7 +159,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     /*******************
      * Traversals and member access
      */
-    
+
     // Get object member by its key.
     abstract get( key : string ) : any
 
@@ -175,11 +175,11 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
         return this._owner;
     }
 
-    // Store used when owner chain store lookup failed. Static value in the prototype. 
+    // Store used when owner chain store lookup failed. Static value in the prototype.
     /** @private */
     _defaultStore : Transactional
 
-    // Locate the closest store. Store object stops traversal by overriding this method. 
+    // Locate the closest store. Store object stops traversal by overriding this method.
     getStore() : Transactional {
         const { _owner } = this;
         return _owner ? <Transactional> _owner.getStore() : this._defaultStore;
@@ -197,7 +197,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     map<T>( iteratee : ( val : any, key : string ) => T, context? : any ) : T[]{
         const arr : T[] = [],
               fun = arguments.length === 2 ? ( v, k ) => iteratee.call( context, v, k ) : iteratee;
-        
+
         this.each( ( val, key ) => {
             const result = fun( val, key );
             if( result !== void 0 ) arr.push( result );
@@ -210,7 +210,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     mapObject<T>( iteratee : ( val : any, key : string | number ) => T, context? : any ) : { [ key : string ] : T }{
         const obj : { [ key : string ] : T } = {},
             fun = arguments.length === 2 ? ( v, k ) => iteratee.call( context, v, k ) : iteratee;
-        
+
         this.each( ( val, key ) => {
             const result = iteratee( val, key );
             if( result !== void 0 ) obj[ key ] = result;
@@ -219,7 +219,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
         return obj;
     }
 
-    // Get array of attribute keys (Record) or record ids (Collection) 
+    // Get array of attribute keys (Record) or record ids (Collection)
     keys() : string[] {
         return this.map( ( value, key ) => {
             if( value !== void 0 ) return key;
@@ -230,7 +230,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     values() : any[] {
         return this.map( value => value );
     }
-    
+
     /*********************************
      * Validation API
      */
@@ -239,10 +239,10 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     /** @private */
     _validationError : ValidationError = void 0
 
-    // Validate ownership tree and return valudation error 
+    // Validate ownership tree and return valudation error
     get validationError() : ValidationError {
         const error = this._validationError || ( this._validationError = new ValidationError( this ) );
-        return error.length ? error : null; 
+        return error.length ? error : null;
     }
 
     // Validate nested members. Returns errors count.
@@ -252,7 +252,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     // Object-level validator. Returns validation error.
     validate( obj? : Transactional ) : any {}
 
-    // Return validation error (or undefined) for nested object with the given key. 
+    // Return validation error (or undefined) for nested object with the given key.
     getValidationError( key : string ) : any {
         var error = this.validationError;
         return ( key ? error && error.nested[ key ] : error ) || null;
@@ -269,7 +269,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
         validationError && validationError.eachError( iteratee, this );
     }
 
-    // Check whenever member with a given key is valid. 
+    // Check whenever member with a given key is valid.
     isValid( key : string ) : boolean {
         return !this.getValidationError( key );
     }
@@ -291,7 +291,7 @@ export interface Owner extends Traversable, Messenger {
 // Transaction object used for two-phase commit protocol.
 // Must be implemented by subclasses.
 // Transaction must be created if there are actual changes and when markIsDirty returns true.
-/** @private */ 
+/** @private */
 export interface Transaction {
     // Object transaction is being made on.
     object : Transactional
@@ -301,9 +301,9 @@ export interface Transaction {
     commit( isNested? : boolean )
 }
 
-// Options for distributed transaction  
+// Options for distributed transaction
 export interface TransactionOptions {
-    // Invoke parsing 
+    // Invoke parsing
     parse? : boolean
 
     // Suppress change notifications and update triggers
@@ -312,7 +312,7 @@ export interface TransactionOptions {
     // Update existing transactional members in place, or skip the update (ignored by models)
     merge? : boolean // =true
 
-    // Should collections remove elements in set (ignored by models)  
+    // Should collections remove elements in set (ignored by models)
     remove? : boolean // =true
 
     // Always replace enclosed objects with new instances
@@ -326,16 +326,16 @@ export interface TransactionOptions {
  * const isRoot = begin( record );
  * ...
  * isRoot && commit( record, options );
- * 
- * When committing nested transaction, the flag must be set to true. 
- * commit( object, options, isNested ) 
+ *
+ * When committing nested transaction, the flag must be set to true.
+ * commit( object, options, isNested )
  */
 
 export const transactionApi = {
     // Start transaction. Return true if it's the root one.
     /** @private */
     begin( object : Transactional ) : boolean {
-        return object._transaction ? false : ( object._transaction = true );  
+        return object._transaction ? false : ( object._transaction = true );
     },
 
     // Mark object having changes inside of the current transaction.
@@ -345,7 +345,7 @@ export const transactionApi = {
         // If silent option is in effect, don't set isDirty flag.
         const dirty = !options.silent;
         if( dirty ) object._isDirty = options;
-        
+
         // Reset version token.
         object._changeToken = {};
 
@@ -365,15 +365,15 @@ export const transactionApi = {
             // Send the sequence of change events, handling chained handlers.
             while( object._isDirty ){
                 const options = object._isDirty;
-                object._isDirty = null; 
+                object._isDirty = null;
                 trigger2( object, object._changeEventName, object, options );
             }
-            
+
             // Mark transaction as closed.
             object._transaction = false;
 
-            // Notify owner on changes out of transaction scope.  
-            const { _owner } = object;  
+            // Notify owner on changes out of transaction scope.
+            const { _owner } = object;
             if( _owner && !isNested ){ // If it's the nested transaction, owner is already aware there are some changes.
                 _owner._onChildrenChange( object, originalOptions );
             }

@@ -1,8 +1,8 @@
-import { Collection, CollectionOptions } from '../collection'
-import { tools, define } from '../object-plus'
-import { Record, TransactionalType } from '../record'
+import { Collection, CollectionOptions } from '../collection/index'
+import { tools, define } from '../object-plus/index'
+import { Record, TransactionalType } from '../record/index'
 import { parseReference, CollectionReference } from './commons'
-import { ChainableAttributeSpec } from '../record'
+import { ChainableAttributeSpec } from '../record/index'
 import { Transactional, TransactionOptions } from '../transactions'
 
 const { fastDefaults } = tools;
@@ -90,7 +90,7 @@ function defineSubsetCollection( CollectionConstructor : typeof Collection ) {
         parse( raw : any ) : Record[] {
             const { resolvedWith } = this,
                 elements = Array.isArray( raw ) ? raw : [ raw ],
-                records : Record[] = [];                            
+                records : Record[] = [];
 
             if( resolvedWith ){
                 for( let element of elements ){

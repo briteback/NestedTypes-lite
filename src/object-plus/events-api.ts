@@ -1,9 +1,9 @@
 /**************************************************************
  * Low-level high-performance publish-subscrive events API.
  * Monomorphic, minimalistic, JIT optimized.
- * 
+ *
  * Implementation is 100% structurally compatible woth a subset of Backbone 1.2 Events.
- * 
+ *
  * Type-R solely depends on that API for managing events subscriptions.
  */
 
@@ -44,12 +44,12 @@ export interface Callback extends Function{
 
 /*******************
  * Prebuilt events map, used for optimized bulk event subscriptions.
- * 
+ *
  * const events = new EventMap({
  *      'change' : true, // Resend this event from self as it is.
  *      'change:attr' : 'localTargetFunction',
  *      'executedInTargetContext' : function(){ ... }
- *      'executedInNativeContext' : '^props.handler' 
+ *      'executedInNativeContext' : '^props.handler'
  * })
  */
 /** @hide */
@@ -89,11 +89,11 @@ export class EventMap {
     }
 
     addEvent( names : string, callback : Function | string | boolean ){
-        const { handlers } = this;   
-        
+        const { handlers } = this;
+
         for( let name of names.split( eventSplitter ) ){
             handlers.push( new EventDescriptor( name, callback ) );
-        }        
+        }
     }
 
     subscribe( target : {}, source : EventSource ){
@@ -125,9 +125,9 @@ class EventDescriptor {
             this.callback = getBubblingHandler( name );
         }
         else if( typeof callback === 'string' ){
-            this.callback = 
+            this.callback =
                 function localCallback(){
-                    const handler = this[ callback ]; 
+                    const handler = this[ callback ];
                     handler && handler.apply( this, arguments );
                 };
         }
@@ -138,7 +138,7 @@ class EventDescriptor {
 }
 
 /****************************
- * Subscription API 
+ * Subscription API
  */
 
 /** @hide */
@@ -154,7 +154,7 @@ export function off( self : EventSource, name : string, callback : Function, con
 }
 
 /*********************************
- * Event-triggering API 
+ * Event-triggering API
  */
 /** @hide */
 export function trigger0( self : EventSource, name : string ) : void {
@@ -251,7 +251,7 @@ function _on( _events : EventsSubscription, name : string, callback : Function, 
 };
 
 // Remove all events with a given name and context, or callback, if its provided.
-/** @hide */ 
+/** @hide */
 function _off( _events : EventsSubscription, name : string, callback : Function, context : {} ) {
     const events = _events[ name ];
 

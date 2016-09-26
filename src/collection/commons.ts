@@ -1,8 +1,8 @@
-import { Record } from '../record'
+import { Record } from '../record/index'
 import { Owner, Transaction,
         TransactionOptions, Transactional, transactionApi } from '../transactions'
 
-import { eventsApi, tools } from '../object-plus'
+import { eventsApi, tools } from '../object-plus/index'
 
 const { EventMap, trigger2, trigger3, on, off } = eventsApi,
       { commit, markAsDirty } = transactionApi,
@@ -15,7 +15,7 @@ export interface CollectionCore extends Transactional, Owner {
     model : typeof Record
     idAttribute : string // TODO: Refactor inconsistent idAttribute usage
     _comparator : Comparator
-    get( objOrId : string | Record | Object ) : Record    
+    get( objOrId : string | Record | Object ) : Record
     _itemEvents? : eventsApi.EventMap
     _shared : number
     _aggregationError : Record[]
@@ -28,7 +28,7 @@ export interface CollectionOptions extends TransactionOptions {
     sort? : boolean
 }
 
-export type Comparator = ( a : Record, b : Record ) => number;  
+export type Comparator = ( a : Record, b : Record ) => number;
 
 /** @private */
 export function dispose( collection : CollectionCore ) : Record[]{
@@ -60,7 +60,7 @@ export function convertAndAquire( collection : CollectionCore, attrs : {} | Reco
             const errors = collection._aggregationError || ( collection._aggregationError = [] );
             errors.push( record );
         }
-    }    
+    }
 
     // Subscribe for events...
     const { _itemEvents } = collection;
@@ -96,7 +96,7 @@ export function freeAll( collection : CollectionCore, children : Record[] ) : Re
 /**
  * Silently sort collection, if its required. Returns true if sort happened.
  * @private
- */   
+ */
 export function sortElements( collection : CollectionCore, options : CollectionOptions ) : boolean {
     let { _comparator } = collection;
     if( _comparator && options.sort !== false ){
@@ -109,23 +109,23 @@ export function sortElements( collection : CollectionCore, options : CollectionO
 
 /**********************************
  * Collection Index
- * @private 
+ * @private
  */
 export interface IdIndex {
     [ id : string ] : Record
 }
 
-/** @private Add record */ 
+/** @private Add record */
 export function addIndex( index : IdIndex, model : Record ) : void {
     index[ model.cid ] = model;
     var id             = model.id;
-    
+
     if( id != null ){
         index[ id ] = model;
     }
 }
 
-/** @private Remove record */ 
+/** @private Remove record */
 export function removeIndex( index : IdIndex, model : Record ) : void {
     delete index[ model.cid ];
     var id = model.id;
@@ -138,9 +138,9 @@ export function removeIndex( index : IdIndex, model : Record ) : void {
  * In Collections, transactions appears only when
  * add remove or change events might be emitted.
  * reset doesn't require transaction.
- * 
+ *
  * Transaction holds information regarding events, and knows how to emit them.
- * 
+ *
  * Two major optimization cases.
  * 1) Population of an empty collection
  * 2) Update of the collection (no or little changes) - it's crucial to reject empty transactions.
@@ -148,7 +148,7 @@ export function removeIndex( index : IdIndex, model : Record ) : void {
 
 
 // Transaction class. Implements two-phase transactions on object's tree.
-/** @private */ 
+/** @private */
 export class CollectionTransaction implements Transaction {
     // open transaction
     constructor(    public object : CollectionCore,
@@ -173,7 +173,7 @@ export class CollectionTransaction implements Transaction {
         }
 
         // Just trigger 'change' on collection, it must be already triggered for models during nested commits.
-        // ??? TODO: do it in nested transactions loop? This way appears to be more correct. 
+        // ??? TODO: do it in nested transactions loop? This way appears to be more correct.
         for( let transaction of nested ){
             trigger2( object, 'change', transaction.object, _isDirty );
         }

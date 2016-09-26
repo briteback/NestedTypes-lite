@@ -5,7 +5,7 @@
 import { Transactional } from '../transactions'
 import { ChangeAttrHandler, AttributeDescriptor } from './attributes'
 import { Record } from './transaction'
-import { EventMap, EventsDefinition, Constructor, tools } from '../object-plus'
+import { EventMap, EventsDefinition, Constructor, tools } from '../object-plus/index'
 
 const { assign } = tools;
 
@@ -125,17 +125,18 @@ Function.prototype.value = function( x ) {
 Object.defineProperty( Function.prototype, 'isRequired', {
     get() {
         return new ChainableAttributeSpec( { type : this, isRequired : true } );
-    } 
+    }
 });*/
 
-Object.defineProperty( Function.prototype, 'has', {
+/*Object.defineProperty( Function.prototype, 'has', {
     get() {
         // workaround for sinon.js and other libraries overriding 'has'
         return this._has || new ChainableAttributeSpec( { type : this } );
     },
 
-    set( value ) { this._has = value; }
-} );
+    set( value ) { this._has = value; },
+    configurable: true
+} );*/
 
 export function toAttributeDescriptor( spec : any ) : AttributeDescriptor {
     let attrSpec : ChainableAttributeSpec;
@@ -150,7 +151,7 @@ export function toAttributeDescriptor( spec : any ) : AttributeDescriptor {
         // Infer type from value.
         const type = inferType( spec );
 
-        // Transactional types inferred from values must have shared type. 
+        // Transactional types inferred from values must have shared type.
         if( type && type.prototype instanceof Transactional ){
             attrSpec = (<any>type).shared.value( spec );
         }
@@ -159,7 +160,7 @@ export function toAttributeDescriptor( spec : any ) : AttributeDescriptor {
             attrSpec = new ChainableAttributeSpec({ type : type, value : spec });
         }
     }
- 
+
     return attrSpec.options;
 }
 

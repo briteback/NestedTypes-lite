@@ -1,7 +1,7 @@
 import { Record } from '../transaction'
 import { GenericAttribute } from './generic'
-import { Owner, transactionApi, Transactional, TransactionOptions, TransactionalConstructor } from '../../transactions' 
-import { tools, eventsApi } from '../../object-plus'
+import { Owner, transactionApi, Transactional, TransactionOptions, TransactionalConstructor } from '../../transactions'
+import { tools, eventsApi } from '../../object-plus/index'
 
 const { on, off } = eventsApi,
     { free, aquire } = transactionApi;
@@ -43,13 +43,13 @@ export class SharedRecordType extends GenericAttribute {
         next && on( next, next._changeEventName, this._onChange, record );
     }
 
-    _onChange : ( child : Transactional, options : TransactionOptions ) => void 
+    _onChange : ( child : Transactional, options : TransactionOptions ) => void
 
     initialize( options ){
         // Shared attributes are not serialized.
         this.toJSON = null;
         if( this.propagateChanges ){
-            // Create change event handler which knows current attribute name. 
+            // Create change event handler which knows current attribute name.
             const attribute = this;
             this._onChange = function( child, options ){
                 this.forceAttributeChange( attribute.name, options );

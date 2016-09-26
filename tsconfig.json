@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "target": "es5",
-    "module":"commonjs",
+    "target": "es6",
+    "module":"ES2015",
     "moduleResolution": "node",
-    "sourceMap": true,
+    "sourceMap": false,
     "outDir": "./dist",
     "noImplicitAny": false,
     "removeComments":true,

@@ -1,6 +1,6 @@
 import { Transaction, transactionApi } from '../transactions'
 import { CollectionTransaction, logAggregationError, IdIndex, convertAndAquire, free, sortElements, CollectionOptions, addIndex, CollectionCore, Elements, freeAll } from './commons'
-import { Record } from '../record'
+import { Record } from '../record/index'
 
 const { begin, commit, markAsDirty } = transactionApi;
 
@@ -40,13 +40,13 @@ export function setTransaction( collection, items, options ){
           removed = reusedCount < previous.length ? (
                         reusedCount ? _garbageCollect( collection, previous ) :
                                         freeAll( collection, previous )
-                    ) : [];                    
-    
+                    ) : [];
+
     const addedOrChanged = nested.length || added.length,
           sorted = ( addedOrChanged && sortElements( collection, options ) ) || added.length || options.sorted;
 
     if( addedOrChanged || removed.length || sorted ){
-        if( markAsDirty( collection, options ) ){ 
+        if( markAsDirty( collection, options ) ){
             return new CollectionTransaction( collection, isRoot, added, removed, nested, sorted );
         }
 
@@ -81,7 +81,7 @@ function _reallocate( collection : CollectionCore, source : any[], nested : Tran
         _byId : IdIndex = {},
         merge       = ( options.merge == null ? true : options.merge ) && !collection._shared,
         _prevById   = collection._byId,
-        prevModels  = collection.models, 
+        prevModels  = collection.models,
         idAttribute = collection.model.prototype.idAttribute,
         toAdd       = [],
         orderKept   = true;

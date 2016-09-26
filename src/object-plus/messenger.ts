@@ -1,6 +1,6 @@
-import Mixins = require( './mixins' )
-import tools = require( './tools' );
-import _eventsApi = require( './events-api' );
+import * as Mixins from './mixins'
+import * as tools from './tools'
+import * as _eventsApi from './events-api'
 import { EventMap, EventsDefinition } from './events-api'
 
 const { mixins, define, extendable } = Mixins,
@@ -37,20 +37,20 @@ export abstract class Messenger implements Mixins.Mixable {
     static extend : (spec? : MessengerDefinition, statics? : {} ) => Mixins.MixableConstructor< Messenger >
     static predefine : () => Mixins.MixableConstructor< Messenger >
 
-    /** @hidden */ 
+    /** @hidden */
     _events : _eventsApi.EventsSubscription = void 0;
 
-    /** @hidden */ 
+    /** @hidden */
     _listeners : Listeners = void 0
 
-    /** @hidden */ 
+    /** @hidden */
     _listeningTo : ListeningToMap = void 0
 
     /** Unique client-only id. */
     cid : string
 
     // Prototype-only property to manage automatic local events subscription.
-    /** @hidden */ 
+    /** @hidden */
     _localEvents : _eventsApi.EventMap
 
     /** @private */
@@ -70,7 +70,7 @@ export abstract class Messenger implements Mixins.Mixable {
         return Mixins.Mixable.define.call( this, spec, staticProps );
     }
 
-    /** @hidden */ 
+    /** @hidden */
     constructor(){
         this.cid = uniqueId();
         this.initialize.apply( this, arguments );
@@ -78,7 +78,7 @@ export abstract class Messenger implements Mixins.Mixable {
 
     /** Method is called at the end of the constructor */
     initialize() : void {}
-    
+
     /** Bind an event to a `callback` function. Passing `"all"` will bind
      *  the callback to all events fired.
      */
@@ -103,7 +103,7 @@ export abstract class Messenger implements Mixins.Mixable {
 
     /** Tell this object to stop listening to either specific events ... or
      * to every object it's currently listening to.
-     */ 
+     */
     stopListening( obj? : Messenger, name? : string, callback? : Function ) : this {
         const listeningTo = this._listeningTo;
         if (!listeningTo) return this;
@@ -127,10 +127,10 @@ export abstract class Messenger implements Mixins.Mixable {
     /** Inversion-of-control versions of `on`. Tell *this* object to listen to
      * an event in another object... keeping track of what it's listening to
      * for easier unbinding later.
-     */ 
+     */
     listenTo(obj : Messenger, name, callback? ) : this {
         if( !obj ) return this;
-        
+
         const id = obj.cid || (obj.cid = uniqueId()),
               listeningTo = this._listeningTo || (this._listeningTo = {});
 
@@ -152,7 +152,7 @@ export abstract class Messenger implements Mixins.Mixable {
      * the callback is invoked, its listener will be removed. If multiple events
      * are passed in using the space-separated syntax, the handler will fire
      * once for each event, not once for a combination of all events.
-     */ 
+     */
     once(name, callback, context)  : this {
         // Map the event into a `{event: once}` object.
         const events = eventsApi(onceMap, {}, name, callback, this.off.bind( this ));
@@ -170,7 +170,7 @@ export abstract class Messenger implements Mixins.Mixable {
      * passed the same arguments as `trigger` is, apart from the event name
      * (unless you're listening on `"all"`, which will cause your callback to
      * receive the true name of the event as the first argument).
-     */ 
+     */
     trigger(name : string, a?, b?, c? ) : this {
         if( !this._events ) return this;
 
@@ -180,12 +180,12 @@ export abstract class Messenger implements Mixins.Mixable {
             case 2 : trigger1( this, name, a ); break;
             case 3 : trigger2( this, name, a, b ); break;
             case 4 : trigger3( this, name, a, b, c ); break;
-            
+
             // Trigger event with more than 3 arguments.
             default :
                 // Passing arguments around killing performance. Convert it to array.
                 const allArgs = Array( arguments.length );
-                
+
                 for( let i = 0; i < allArgs.length; i++ ){
                     allArgs[ i ] = arguments[ i ];
                 }
@@ -195,7 +195,7 @@ export abstract class Messenger implements Mixins.Mixable {
                 let queue = _events[ name ];
 
                 if( queue ) _fireEventAll( queue, allArgs.slice( 1 ) );
-                if( queue = _events.all ) _fireEventAll( queue, allArgs );                      
+                if( queue = _events.all ) _fireEventAll( queue, allArgs );
         }
 
         return this;
@@ -203,7 +203,7 @@ export abstract class Messenger implements Mixins.Mixable {
 
     /**
      * Destructor. Stops messenger from listening to all objects,
-     * and stop others from listening to the messenger. 
+     * and stop others from listening to the messenger.
      */
     dispose() : void {
         this.stopListening();
@@ -279,10 +279,10 @@ function onApi(events : _eventsApi.EventsSubscription, name : string, callback :
     if (callback) {
         const handlers = events[name],
               toAdd = [ options.clone( callback ) ];
-            
+
         events[name] = handlers ? handlers.concat( toAdd ) : toAdd;
     }
-    
+
     return events;
 };
 

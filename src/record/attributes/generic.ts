@@ -1,5 +1,5 @@
 import { setAttribute, Record, Attribute, Transform, ChangeHandler, AttributeDescriptor } from '../transaction'
-import { Constructor, tools } from '../../object-plus'
+import { Constructor, tools } from '../../object-plus/index'
 import { Owner, Transactional, TransactionOptions } from '../../transactions'
 
 const { notEqual, assign} = tools;
@@ -17,14 +17,14 @@ interface ExtendedAttributeDescriptor extends AttributeDescriptor {
     _attribute? : typeof GenericAttribute
     validate? : ( record : Record, value : any, key : string ) => any
     changeEvents? : boolean
-} 
+}
 
 export { ExtendedAttributeDescriptor as AttributeDescriptor }
 
 // TODO: interface differs from options, do something obout it
 /** @private */
 export class GenericAttribute implements Attribute {
-    // Factory method to create attribute from options 
+    // Factory method to create attribute from options
     static create( options : ExtendedAttributeDescriptor, name : string ) : GenericAttribute {
         const type = options.type,
               AttributeCtor = options._attribute || ( type ? type._attribute : GenericAttribute );
@@ -76,7 +76,7 @@ export class GenericAttribute implements Attribute {
 
             const proto = Object.getPrototypeOf( value );
 
-            // attempt to deep copy raw objects, assuming they are JSON 
+            // attempt to deep copy raw objects, assuming they are JSON
             if( proto === Object.prototype || proto === Array.prototype ){
                 return JSON.parse( JSON.stringify( value ) ); // FIXME! This cloning will not work for Dates.
             }
@@ -145,7 +145,7 @@ export class GenericAttribute implements Attribute {
         this.parse  = parse;
         this.toJSON = toJSON === void 0 ? this.toJSON : toJSON;
 
-        this.validate = validate || this.validate; 
+        this.validate = validate || this.validate;
 
         /**
          * Assemble pipelines...
@@ -164,11 +164,11 @@ export class GenericAttribute implements Attribute {
         if( getHooks.length ){
             this.getHook = getHooks.reduce( chainGetHooks );
         }
-        
+
         if( transforms.length ){
             this.transform = transforms.reduce( chainTransforms );
         }
-        
+
         if( changeHandlers.length ){
             this.handleChange = changeHandlers.reduce( chainChangeHandlers );
         }
