@@ -7,9 +7,13 @@ import { addTransaction } from './add'
 import { setTransaction, emptySetTransaction } from './set'
 import { removeOne, removeMany } from './remove'
 
+import { map } from 'lodash';
+
 const { trigger2, on, off } = eventsApi,
     { begin, commit, markAsDirty } = transactionApi,
     { omit, log, assign, defaults } = tools;
+
+
 
 let _count = 0;
 
@@ -30,6 +34,11 @@ interface CollectionDefinition extends TransactionalDefinition {
 }
 
 const slice = Array.prototype.slice;
+
+class CollectionRefsType extends SharedType {
+    static defaultValue = [];
+}
+
 
 @define({
     // Default client id prefix
@@ -189,8 +198,12 @@ export class Collection extends Transactional implements CollectionCore {
         }
     }
 
+    // this solution does not support iteratee shorthands, and we use that alot :/
+
     map< T >( iteratee : ( val : Record, key : number ) => T, context? : any ) : T[]{
-        const fun = arguments.length === 2 ? ( v, k ) => iteratee.call( context, v, k ) : iteratee,
+
+        return map(this.models, iteratee);
+        /*const fun = arguments.length === 2 ? ( v, k ) => iteratee.call( context, v, k ) : iteratee,
             { models } = this,
             mapped = Array( models.length );
 
@@ -203,7 +216,7 @@ export class Collection extends Transactional implements CollectionCore {
 
         mapped.length = j;
 
-        return mapped;
+        return mapped;*/
     }
 
     _validateNested( errors : {} ) : number {
@@ -467,10 +480,6 @@ type ElementsArg = Object | Record | Object[] | Record[];
 function toElements( collection : Collection, elements : ElementsArg, options : CollectionOptions ) : Elements {
     const parsed = options.parse ? collection.parse( elements, options ) : elements;
     return Array.isArray( parsed ) ? parsed : [ parsed ];
-}
-
-class CollectionRefsType extends SharedType {
-    static defaultValue = [];
 }
 
 createSharedTypeSpec( Collection, SharedType );
