@@ -1,5 +1,5 @@
 import { Record } from '../record/index'
-import { Owner, Transaction,
+import { Owner, Transaction, ItemsBehavior,
         TransactionOptions, Transactional, transactionApi } from '../transactions'
 
 import { eventsApi, tools } from '../object-plus/index'
@@ -19,6 +19,8 @@ export interface CollectionCore extends Transactional, Owner {
     _itemEvents? : eventsApi.EventMap
     _shared : number
     _aggregationError : Record[]
+
+    _log( level : string, text : string, value )
 }
 
 // Collection's manipulation methods elements
@@ -44,12 +46,13 @@ export function dispose( collection : CollectionCore ) : Record[]{
 /** @private */
 export function convertAndAquire( collection : CollectionCore, attrs : {} | Record, options ){
     const { model } = collection;
+
     let record : Record;
 
     if( collection._shared ){
         record = attrs instanceof model ? attrs : <Record>model.create( attrs, options );
 
-        if( collection._shared === 1 ){
+        if( collection._shared & ItemsBehavior.listen ){
             on( record, record._changeEventName, collection._onChildrenChange, collection );
         }
     }
@@ -72,7 +75,7 @@ export function convertAndAquire( collection : CollectionCore, attrs : {} | Reco
 /** @private */
 export function free( owner : CollectionCore, child : Record ) : void {
     if( owner._shared ){
-        if( owner._shared === 1 ){
+        if( owner._shared & ItemsBehavior.listen ){
             off( child, child._changeEventName, owner._onChildrenChange, owner );
         }
     }
@@ -134,6 +137,13 @@ export function removeIndex( index : IdIndex, model : Record ) : void {
     }
 }
 
+export function updateIndex( index : IdIndex, model : Record ){
+    delete index[ model.previous( model.idAttribute ) ];
+
+    const { id } = model;
+    id == null || ( index[ id ] = model );
+}
+
 /***
  * In Collections, transactions appears only when
  * add remove or change events might be emitted.
@@ -159,13 +169,13 @@ export class CollectionTransaction implements Transaction {
                     public sorted : boolean ){}
 
     // commit transaction
-    commit( isNested? : boolean ){
+    commit( initiator? : Transactional ){
         const { nested, object } = this,
               { _isDirty } = object;
 
         // Commit all nested transactions...
         for( let transaction of nested ){
-            transaction.commit( true );
+            transaction.commit( object );
         }
 
         if( object._aggregationError ){
@@ -201,11 +211,11 @@ export class CollectionTransaction implements Transaction {
             trigger2( object, 'update', object, _isDirty );
         }
 
-        this.isRoot && commit( object, isNested );
+        this.isRoot && commit( object, initiator );
     }
 }
 
 export function logAggregationError( collection : CollectionCore ){
-    tools.log.warn( '[Collection] Added records which already has an owner:', collection._aggregationError, collection );
+    collection._log( 'error', 'added records already have an owner', collection._aggregationError );
     collection._aggregationError = void 0;
 }

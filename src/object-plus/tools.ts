@@ -1,8 +1,8 @@
 /**
  * Simple overridable logging stubs, writing to `console` by default.
  * Node.js users might want to redirect logging somewhere.
- * 
- * This is the singleton avaliable globally through `Object.log` or 
+ *
+ * This is the singleton avaliable globally through `Object.log` or
  * exported [[log]] variable.
  */
 export class Log {
@@ -15,14 +15,14 @@ export class Log {
      */
     level : number
 
-    /** Stop in debugger on specified logging events. 
-     * 
+    /** Stop in debugger on specified logging events.
+     *
      *      Object.log.stops.error = true;
      */
     stops : LogOptions = {}
 
     /** Throw exceptions for specified logging events.
-     *  
+     *
      *      Object.log.throws.error = true;
      */
     throws : LogOptions = {}
@@ -96,7 +96,7 @@ Object.log - Object+ Logging and Debugging Utility
 Object.log.counts: Number of logged events by type
     { errors : ${ this.counts.error }, warns : ${ this.counts.warn }, info : ${ this.counts.info }, debug : ${ this.counts.debug } }
 
-Object.log.level == ${ this.level } : Ignore events which are above specified level 
+Object.log.level == ${ this.level } : Ignore events which are above specified level
     - 0 - logging is off;
     - 1 - Object.log.error(...) only;
     - 2 - .error() and .warn();
@@ -104,7 +104,7 @@ Object.log.level == ${ this.level } : Ignore events which are above specified le
     - 4 - all of above plus .debug().
 
 Object.log.stops: Stops in debugger for some certain event types
-     { error : ${ this.stops.error || false }, warn  : ${ this.stops.warn || false }, info  : ${ this.stops.info || false }, debug : ${ this.stops.debug || false } } 
+     { error : ${ this.stops.error || false }, warn  : ${ this.stops.warn || false }, info  : ${ this.stops.info || false }, debug : ${ this.stops.debug || false } }
 
 Object.log.throws: Throws expection on some certain event types
      { error : ${ this.throws.error || false }, warn  : ${ this.throws.warn || false }, info  : ${ this.throws.info || false }, debug : ${ this.throws.debug || false } }
@@ -242,7 +242,7 @@ export function getPropertyDescriptor( obj : {}, prop : string ) : PropertyDescr
     let desc : PropertyDescriptor;
 
     for( let proto = obj; !desc && proto; proto = Object.getPrototypeOf( proto ) ) {
-        desc = Object.getOwnPropertyDescriptor( obj, prop );
+        desc = Object.getOwnPropertyDescriptor( proto, prop );
     }
 
     return desc;
@@ -258,7 +258,7 @@ export function omit( source ) : {} {
     }
 
     for( var name in source ) {
-        if( !discard[ name ] && source.hasOwnProperty( name ) ) {
+        if( !discard.hasOwnProperty( name ) && source.hasOwnProperty( name ) ) {
             dest[ name ] = source[ name ];
         }
     }
@@ -267,7 +267,7 @@ export function omit( source ) : {} {
 }
 
 /** map `source` object properties with a given function, and assign the result to the `dest` object.
- * When `fun` returns `undefined`, skip this value. 
+ * When `fun` returns `undefined`, skip this value.
  */
 export function transform< A, B >( dest : { [ key : string ] : A }, source : { [ key : string ] : B }, fun : ( value : B, key : string ) => A | void ) : { [ key : string ] : A } {
     for( var name in source ) {
@@ -281,23 +281,23 @@ export function transform< A, B >( dest : { [ key : string ] : A }, source : { [
 }
 
 /** @hidden */
-export function fastAssign< A, B >( dest : A, source : B ) : A & B {
+export function fastAssign< A >( dest : A, source : {} ) : A {
     for( var name in source ) {
         dest[ name ] = source[ name ];
     }
 
-    return <A & B >dest;
+    return dest;
 }
 
 /** @hidden */
-export function fastDefaults<A, B>( dest : A, source : B ) : A & B {
+export function fastDefaults< A >( dest : A, source : {} ) : A {
     for( var name in source ) {
         if( dest[ name ] === void 0 ){
             dest[ name ] = source[ name ];
         }
     }
 
-    return <A & B >dest;
+    return dest;
 }
 
 /** Similar to underscore `_.extend` and `Object.assign` */
@@ -323,7 +323,7 @@ export function assign< T >( dest : T, source : Object ) : T {
 export function defaults< T >( dest : T, ...sources : Object[] ) : T
 export function defaults< T >( dest : T, source : Object ) : T {
     for( var name in source ) {
-        if( source.hasOwnProperty( name ) && dest[ name ] === void 0 ) {
+        if( source.hasOwnProperty( name ) && !dest.hasOwnProperty( name ) ) {
             dest[ name ] = source[ name ];
         }
     }
@@ -337,6 +337,15 @@ export function defaults< T >( dest : T, source : Object ) : T {
 
     return dest;
 }
+
+// Polyfill for IE10. Should fix problems with babel and statics inheritance.
+declare global {
+    interface ObjectConstructor {
+        setPrototypeOf( target : Object, proto : Object );
+    }
+}
+
+Object.setPrototypeOf || ( Object.setPrototypeOf = defaults );
 
 /** Similar to underscore `_.keys` */
 export function keys( o : any ) : string[]{
@@ -356,12 +365,13 @@ export function once( func : Function ) : Function {
     };
 }
 
+/** @hidden */
 const ArrayProto = Array.prototype,
       DateProto = Date.prototype,
       ObjectProto = Object.prototype;
 
 /**
- * Determine whenever two values are not equal, deeply traversing 
+ * Determine whenever two values are not equal, deeply traversing
  * arrays and plain JS objects (hashes). Dates are compared by enclosed timestamps, all other
  * values are compared with strict comparison.
  */

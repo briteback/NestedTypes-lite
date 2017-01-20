@@ -1,9 +1,9 @@
 import { Collection, CollectionOptions } from '../collection/index'
 import { tools, define } from '../object-plus/index'
-import { Record, TransactionalType } from '../record/index'
+import { Record, AggregatedType } from '../record/index'
 import { parseReference, CollectionReference } from './commons'
 import { ChainableAttributeSpec } from '../record/index'
-import { Transactional, TransactionOptions } from '../transactions'
+import { Transactional, ItemsBehavior, TransactionOptions } from '../transactions'
 
 const { fastDefaults } = tools;
 
@@ -16,14 +16,12 @@ Collection.subsetOf = function subsetOf( masterCollection : CollectionReference 
             type : SubsetOf
         });
 
-    typeSpec.get(
+    return typeSpec.get(
         function( refs ){
             !refs || refs.resolvedWith || refs.resolve( getMasterCollection( this ) );
             return refs;
         }
     );
-
-    return typeSpec;
 };
 
 /** @private */
@@ -33,16 +31,20 @@ function subsetOptions( options : CollectionOptions ){
     return subsetOptions;
 }
 
+const subsetOfBehavior = ItemsBehavior.share | ItemsBehavior.persistent;
+
 function defineSubsetCollection( CollectionConstructor : typeof Collection ) {
     @define({})
     class SubsetOfCollection extends CollectionConstructor {
         refs : any[];
         resolvedWith : Collection = null;
 
-        _attribute : TransactionalType
+        _attribute : AggregatedType
+
+        get __inner_state__(){ return this.refs || this.models; }
 
         constructor( recordsOrIds?, options? ){
-            super( recordsOrIds, subsetOptions( options ), 2 );
+            super( recordsOrIds, subsetOptions( options ), subsetOfBehavior );
         }
 
         add( elements, options? ){

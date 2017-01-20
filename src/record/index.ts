@@ -4,7 +4,7 @@ import { compile, AttributesSpec } from './define'
 import { ChainableAttributeSpec } from './typespec'
 import { Transactional } from '../transactions'
 
-import { TransactionalType, MSDateType, TimestampType, NumericType, SharedRecordType } from './attributes/index'
+import { AggregatedType, MSDateType, TimestampType, NumericType, SharedType } from './attributes/index'
 
 export * from './attributes/index'
 export { Record, ChainableAttributeSpec }
@@ -21,7 +21,7 @@ Record.define = function( protoProps : RecordDefinition = {}, staticProps ){
           definition = assign( staticsDefinition, protoProps );
 
     if( 'Collection' in this && this.Collection === void 0 ){
-        tools.log.error( `[Model.define] Model.Collection is undefined. It must be defined _before_ the model.`, definition );
+        tools.log.error( `[Model Definition] ${ this.prototype.getClassName() }.Collection is undefined. It must be defined _before_ the model.`, definition );
     }
 
     // Compile attributes spec, creating definition mixin.
@@ -35,7 +35,7 @@ Record.define = function( protoProps : RecordDefinition = {}, staticProps ){
     assign( dynamicMixin.properties, protoProps.properties || {} );
 
     // Merge in definition.
-    defaults( dynamicMixin, omit( definition, 'attributes', 'collection' ) );
+    assign( dynamicMixin, omit( definition, 'attributes', 'collection', 'defaults', 'properties', 'forEachAttr' ) );
     Mixable.define.call( this, dynamicMixin, staticProps );
     defineCollection.call( this, definition.collection || definition.Collection );
 
@@ -48,13 +48,13 @@ Record.predefine = function(){
     this.Collection = getBaseClass( this ).Collection.extend();
     this.Collection.prototype.model = this;
 
-    createSharedTypeSpec( this, SharedRecordType );
+    createSharedTypeSpec( this, SharedType );
 
     return this;
 }
 
-Record._attribute = TransactionalType;
-createSharedTypeSpec( Record, SharedRecordType );
+Record._attribute = AggregatedType;
+createSharedTypeSpec( Record, SharedType );
 
 function getAttributes({ defaults, attributes, idAttribute } : RecordDefinition ) : AttributeDescriptorMap {
     const definition = typeof defaults === 'function' ? (<any>defaults)() : attributes || defaults || {};
@@ -89,7 +89,7 @@ declare global {
     }
 }
 
-/*Object.defineProperties( Date, {
+Object.defineProperties( Date, {
     microsoft : {
         get(){
             return new ChainableAttributeSpec({
@@ -107,7 +107,7 @@ declare global {
             })
         }
     }
-});*/
+});
 
 // Add Number.integer attrubute type
 declare global {

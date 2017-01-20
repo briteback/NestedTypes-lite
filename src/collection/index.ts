@@ -1,13 +1,13 @@
 import { define, tools, eventsApi, EventMap, EventsDefinition, Mixable } from '../object-plus/index'
-import { transactionApi, Transactional, CloneOptions, Transaction, TransactionOptions, TransactionalDefinition, Owner } from '../transactions'
-import { Record, SharedRecordType, TransactionalType, createSharedTypeSpec } from '../record/index'
+import { ItemsBehavior, transactionApi, Transactional, CloneOptions, Transaction, TransactionOptions, TransactionalDefinition, Owner } from '../transactions'
+import { Record, SharedType, AggregatedType, createSharedTypeSpec } from '../record/index'
 
-import { IdIndex, sortElements, dispose, Elements, CollectionCore, addIndex, removeIndex, Comparator, CollectionTransaction } from './commons/'
+import { IdIndex, free, sortElements, dispose, Elements, CollectionCore, addIndex, removeIndex, updateIndex, Comparator, CollectionTransaction } from './commons'
 import { addTransaction } from './add'
 import { setTransaction, emptySetTransaction } from './set'
 import { removeOne, removeMany } from './remove'
 
-const { trigger2 } = eventsApi,
+const { trigger2, on, off } = eventsApi,
     { begin, commit, markAsDirty } = transactionApi,
     { omit, log, assign, defaults } = tools;
 
@@ -29,6 +29,8 @@ interface CollectionDefinition extends TransactionalDefinition {
     _itemEvents? : EventMap
 }
 
+const slice = Array.prototype.slice;
+
 @define({
     // Default client id prefix
     cidPrefix : 'c',
@@ -41,7 +43,7 @@ export class Collection extends Transactional implements CollectionCore {
     _aggregationError : Record[]
 
     static Subset : typeof Collection
-    static Set : typeof Collection
+    static Refs : typeof Collection
     static _SubsetOf : typeof Collection
 
     createSubset( models, options ){
@@ -57,28 +59,25 @@ export class Collection extends Transactional implements CollectionCore {
         const Ctor = this;
         this._SubsetOf = null;
 
-        function Subset( a, b, listen? ){
-            Ctor.call( this, a, b, listen ? 1 : 2 );
+        function RefsCollection( a, b, listen? ){
+            Ctor.call( this, a, b, ItemsBehavior.share | ( listen ? ItemsBehavior.listen : 0 ) );
         }
 
-        Mixable.mixTo( Subset );
+        Mixable.mixTo( RefsCollection );
 
-        Subset.prototype = this.prototype;
-        Subset._attribute = TransactionalType;
-        Subset[ 'of' ] = function( path ){
-            return Ctor.subsetOf( path );
-        }
+        RefsCollection.prototype = this.prototype;
+        RefsCollection._attribute = CollectionRefsType;
 
-        this.Set = this.Subset = <any>Subset;
+        this.Refs = this.Subset = <any>RefsCollection;
 
         Transactional.predefine.call( this );
-        createSharedTypeSpec( this, SharedCollectionType );
+        createSharedTypeSpec( this, SharedType );
         return this;
     }
 
     static define( protoProps : CollectionDefinition = {}, staticProps? ){
                 // Extract record definition from static members, if any.
-        const   staticsDefinition : CollectionDefinition = tools.getChangedStatics( this, 'model', 'itemEvents' ),
+        const   staticsDefinition : CollectionDefinition = tools.getChangedStatics( this, 'comparator', 'model', 'itemEvents' ),
                 // Definition can be made either through statics or define argument.
                 // Merge them together, so we won't care about it below.
                 definition = assign( staticsDefinition, protoProps );
@@ -105,7 +104,7 @@ export class Collection extends Transactional implements CollectionCore {
     models : Record[]
 
     // Polymorphic accessor for aggregated attribute's canBeUpdated().
-    get _state(){ return this.models; }
+    get __inner_state__(){ return this.models; }
 
     // Index by id and cid
     _byId : IdIndex
@@ -149,17 +148,17 @@ export class Collection extends Transactional implements CollectionCore {
     get comparator(){ return this._comparator; }
     _comparator : ( a : Record, b : Record ) => number
 
-    _onChildrenChange( record : Record, options : TransactionOptions = {} ){
-        const isRoot = begin( this ),
-            { idAttribute } = this;
+    _onChildrenChange( record : Record, options : TransactionOptions = {}, initiator? : Transactional ){
+        // Ignore updates from nested transactions.
+        if( initiator === this ) return;
+
+        const { idAttribute } = this;
 
         if( record.hasChanged( idAttribute ) ){
-            const { _byId } = this;
-            delete _byId[ record.previous( idAttribute ) ];
-
-            const { id } = record;
-            id == null || ( _byId[ id ] = record );
+            updateIndex( this._byId, record );
         }
+
+        const isRoot = begin( this );
 
         if( markAsDirty( this, options ) ){
             // Forward change event from the record.
@@ -182,12 +181,29 @@ export class Collection extends Transactional implements CollectionCore {
     }
 
     each( iteratee : ( val : Record, key : number ) => void, context? : any ){
-        const fun = arguments.length === 2 ? ( v, k ) => iteratee.call( context, v, k ) : iteratee,
+        const fun = context !== void 0 ? ( v, k ) => iteratee.call( context, v, k ) : iteratee,
             { models } = this;
 
         for( let i = 0; i < models.length; i++ ){
             fun( models[ i ], i );
         }
+    }
+
+    map< T >( iteratee : ( val : Record, key : number ) => T, context? : any ) : T[]{
+        const fun = arguments.length === 2 ? ( v, k ) => iteratee.call( context, v, k ) : iteratee,
+            { models } = this,
+            mapped = Array( models.length );
+
+        let j = 0;
+
+        for( let i = 0; i < models.length; i++ ){
+            const x = fun( models[ i ], i );
+            x === void 0 || ( mapped[ j++ ] = x );
+        }
+
+        mapped.length = j;
+
+        return mapped;
     }
 
     _validateNested( errors : {} ) : number {
@@ -257,7 +273,7 @@ export class Collection extends Transactional implements CollectionCore {
 
     // Deeply clone collection, optionally setting new owner.
     clone( options : CloneOptions = {} ) : this {
-        const models = this.map( model => model.clone() ),
+        const models = this._shared & ItemsBehavior.share ? this.models : this.map( model => model.clone() ),
               copy : this = new (<any>this.constructor)( models, { model : this.model, comparator : this.comparator }, this._shared );
 
         if( options.pinStore ) copy._defaultStore = this.getStore();
@@ -266,16 +282,13 @@ export class Collection extends Transactional implements CollectionCore {
     }
 
     toJSON() : Object[] {
-        // Don't serialize when not aggregated
-        if( !this._shared ){
-            return this.models.map( model => model.toJSON() );
-        }
+        return this.models.map( model => model.toJSON() );
     }
 
     // Apply bulk in-place object update in scope of ad-hoc transaction
     set( elements : ElementsArg = [], options : TransactionOptions = {} ) : this {
         if( (<any>options).add !== void 0 ){
-            log.error("Collection.set doesn't support 'add' option, behaving as if options.add === true.");
+            this._log( 'warn', "Collection.set doesn't support 'add' option, behaving as if options.add === true.", options );
         }
 
         // Handle reset option here - no way it will be populated from the top as nested transaction.
@@ -290,17 +303,21 @@ export class Collection extends Transactional implements CollectionCore {
         return this;
     }
 
-    dispose(){
-        if( !this._shared ){
-            for( let record of this.models ){
-                if( record._owner === this ) record.dispose();
-            }
+    dispose() : void {
+        if( this._disposed ) return;
+
+        const aggregated = !this._shared;
+
+        for( let record of this.models ){
+            free( this, record );
+
+            if( aggregated ) record.dispose();
         }
 
         super.dispose();
     }
 
-    reset( a_elements : ElementsArg, options : TransactionOptions = {} ) : Record[] {
+    reset( a_elements? : ElementsArg, options : TransactionOptions = {} ) : Record[] {
         const isRoot = begin( this ),
               previousModels = dispose( this );
 
@@ -356,7 +373,7 @@ export class Collection extends Transactional implements CollectionCore {
         }
     }
 
-    static _attribute = TransactionalType;
+    static _attribute = AggregatedType;
 
     /***********************************
      * Collection manipulation methods
@@ -434,6 +451,14 @@ export class Collection extends Transactional implements CollectionCore {
 
         return next;
     }
+
+    _log( level : string, text : string, value ) : void {
+        tools.log[ level ]( `[Collection Update] ${ this.model.prototype.getClassName() }.${ this.getClassName() }: ` + text, value, 'Attributes spec:', this.model.prototype._attributes );
+    }
+
+    getClassName() : string {
+        return super.getClassName() || 'Collection';
+    }
 }
 
 type ElementsArg = Object | Record | Object[] | Record[];
@@ -444,17 +469,10 @@ function toElements( collection : Collection, elements : ElementsArg, options : 
     return Array.isArray( parsed ) ? parsed : [ parsed ];
 }
 
-const slice = Array.prototype.slice;
-
-class SharedCollectionType extends SharedRecordType {
-    type : typeof Collection
-        // Shared object can never be type casted.
-    convert( value : any, options : TransactionOptions, prev : any, record : Record ) : Transactional {
-        return value == null || value instanceof this.type ? value : new this.type( value, options, 1 );
-    }
+class CollectionRefsType extends SharedType {
+    static defaultValue = [];
 }
 
-
-createSharedTypeSpec( Collection, SharedCollectionType );
+createSharedTypeSpec( Collection, SharedType );
 
 Record.Collection = <any>Collection;

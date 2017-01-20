@@ -1,34 +1,36 @@
-import { GenericAttribute } from './generic'
+import { AnyType } from './generic'
 import { tools } from '../../object-plus/index'
 
 const DateProto = Date.prototype;
 
 // Date Attribute
 /** @private */
-export class DateType extends GenericAttribute {
-    convert( value : any ){
+export class DateType extends AnyType {
+    convert( value : any, a?, b?, record? ){
         if( value == null || value instanceof Date ) return value;
 
-        const date = new Date( value );
+        const date = new Date( value ),
+              timestamp = date.getTime();
 
-        if( isNaN( +date ) ) logInvalidDate( this, value, arguments[ 3 ] );
+        if( timestamp !== timestamp ){
+            this._log( 'warn', 'assigned with Invalid Date', value, record );
+        }
 
         return date;
     }
 
     validate( model, value, name ) {
-        if( value != null && isNaN( +value ) ) return name + ' is Invalid Date';
+        if( value != null ){
+            const timestamp = value.getTime();
+            if( timestamp !== timestamp ) return name + ' is Invalid Date';
+        }
     }
 
     toJSON( value ) { return value && value.toISOString(); }
 
-    isChanged( a, b ) { return ( a && +a ) !== ( b && +b ); }
+    isChanged( a, b ) { return ( a && a.getTime() ) !== ( b && b.getTime() ); }
 
-    clone( value ) { return value && new Date( +value ); }
-}
-
-function logInvalidDate( attribute, value, record ){
-    tools.log.warn(`[Invalid Date] in ${ record.constructor.name || 'Model' }.${ attribute.name } attribute.`, value, record );
+    clone( value ) { return value && new Date( value.getTime() ); }
 }
 
 Date._attribute = DateType;
@@ -74,7 +76,7 @@ const numericKeys    = [ 1, 4, 5, 6, 7, 10, 11 ],
       isoDatePattern = /^(\d{4}|[+\-]\d{6})(?:-(\d{2})(?:-(\d{2}))?)?(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{3}))?)?(?:(Z)|([+\-])(\d{2})(?::(\d{2}))?)?)?$/;
 
 function safeParseDate( date : string ) : number {
-    var timestamp, struct, minutesOffset = 0;
+    var timestamp, struct : any[], minutesOffset = 0;
 
     if( ( struct = isoDatePattern.exec( date )) ) {
         // avoid NaN timestamps caused by undefined values being passed to Date.UTC

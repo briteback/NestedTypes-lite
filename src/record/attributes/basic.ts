@@ -1,9 +1,9 @@
-import { GenericAttribute } from './generic'
+import { AnyType } from './generic'
 import { tools } from '../../object-plus/index'
 
 // Default attribute type for all constructor functions...
 /** @private */
-class ConstructorType extends GenericAttribute {
+class ConstructorType extends AnyType {
     type : new ( value : any ) => {}
 
     convert( value ) {
@@ -12,7 +12,7 @@ class ConstructorType extends GenericAttribute {
 
     clone( value ) {
         // delegate to clone function or deep clone through serialization
-        return value.clone ? value.clone() : this.convert( JSON.parse( JSON.stringify( value ) ) );
+        return value && value.clone ? value.clone() : this.convert( JSON.parse( JSON.stringify( value ) ) );
     }
 }
 
@@ -20,7 +20,7 @@ Function.prototype._attribute = ConstructorType;
 
 // Primitive Types.
 /** @private */
-export class PrimitiveType extends GenericAttribute {
+export class PrimitiveType extends AnyType {
     type : NumberConstructor | StringConstructor | BooleanConstructor
 
     create() { return this.type(); }
@@ -41,10 +41,12 @@ Boolean._attribute = String._attribute = PrimitiveType;
 export class NumericType extends PrimitiveType {
     type : NumberConstructor
 
-    convert( value ) {
+    convert( value, a?, b?, record? ) {
         const num = value == null ? value : this.type( value );
 
-        if( num !== num ) logInvalidNumber( this, value, arguments[ 3 ] );
+        if( num !== num ){
+            this._log( 'warn', 'assigned with Invalid Number', value, record );
+        }
 
         return num;
     }
@@ -57,26 +59,25 @@ export class NumericType extends PrimitiveType {
     }
 }
 
-function logInvalidNumber( attribute, value, record ){
-    tools.log.warn(`[Invalid Number] in ${ record.constructor.name || 'Model' }.${ attribute.name } attribute.`, value, record );
-}
-
 Number._attribute = NumericType;
 
 /**
  * Compatibility wrapper for Array type.
  * @private
  */
-export class ArrayType extends GenericAttribute {
+export class ArrayType extends AnyType {
     toJSON( value ) { return value; }
 
-    convert( value ) {
+    convert( value, a?, b?, record? ) {
         // Fix incompatible constructor behaviour of Array...
         if( value == null || Array.isArray( value ) ) return value;
 
-        // todo: log an error.
+        this._log( 'warn', 'assigned with non-array', value, record );
+
         return [];
     }
+
+    clone( value ){ return value && value.slice(); }
 }
 
 Array._attribute = ArrayType;

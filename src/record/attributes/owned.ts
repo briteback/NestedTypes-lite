@@ -1,19 +1,25 @@
 import { Record } from '../transaction'
-import { GenericAttribute } from './generic'
-import { Owner, transactionApi, Transactional, TransactionOptions, TransactionalConstructor } from '../../transactions'
-import { tools } from '../../object-plus/index'
+import { AnyType } from './generic'
+import { Owner, transactionApi, Transactional, ItemsBehavior, TransactionOptions, TransactionalConstructor } from '../../transactions'
+import { tools } from '../../object-plus/index' 
 
 const { free, aquire } = transactionApi;
 
-export class TransactionalType extends GenericAttribute {
+export class AggregatedType extends AnyType {
     type : TransactionalConstructor
+
+    clone( value : Transactional ) : Transactional {
+        return value ? value.clone() : value;
+    }
+
+    toJSON( x ){ return x && x.toJSON(); }
 
     canBeUpdated( prev : Transactional, next : any, options : TransactionOptions ) : any {
         // If an object already exists, and new value is of incompatible type, let object handle the update.
         if( prev && next != null ){
             if( next instanceof this.type ){
                 // In case if merge option explicitly specified, force merge.
-                if( options.merge ) return next._state;
+                if( options.merge ) return next.__inner_state__;
             }
             else{
                 return next;
@@ -26,14 +32,21 @@ export class TransactionalType extends GenericAttribute {
         if( value == null ) return value;
 
         if( value instanceof this.type ){
-            if( value._shared === 1 ){
-                tools.log.warn( `[Record] Aggregated attribute "${ this.name } : ${ (<any>this.type).name || 'Collection' }" is assigned with shared collection type.`, value, record._attributes );
+            if( value._shared && !( value._shared & ItemsBehavior.persistent ) ) { // TODO: think more about shared types assignment compatibility.
+                this._log( 'error', 'aggregated attribute is assigned with shared collection type', value, record );
             }
 
-            return options.merge ? value.clone() : value;
+            return options.merge ? value.clone() : value; // TODO: looks like clone is never called. Remove.
         }
 
         return <any>this.type.create( value, options );
+    }
+
+    dispose ( record : Record, value : Transactional ){
+        if( value ){
+            free( record, value );
+            value.dispose();
+        }
     }
 
     validate( record : Record, value : Transactional ){
@@ -42,7 +55,7 @@ export class TransactionalType extends GenericAttribute {
     }
 
     create() : Transactional {
-        return new (<any>this.type)(); // this the subclass of Transactional here.
+        return (<any>this.type).create(); // this the subclass of Transactional here.
     }
 
     initialize( options ){
@@ -53,9 +66,9 @@ export class TransactionalType extends GenericAttribute {
         prev && free( record, prev );
 
         if( next && !aquire( record, next, this.name ) ){
-            tools.log.warn( `[Record] aggregated '${this.name}' attribute value already has an owner.`, next, record._attributes );
+            this._log( 'error', 'aggregated attribute assigned with object which is aggregated somewhere else', next, record );
         }
     }
 }
 
-Record._attribute = TransactionalType;
+Record._attribute = AggregatedType;

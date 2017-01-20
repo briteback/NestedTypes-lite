@@ -1,4 +1,4 @@
-import { Messenger, Listeners, ListeningToMap, MixinRules, MessengerDefinition, tools, extendable, mixins, eventsApi, define, Constructor, MixableConstructor } from './object-plus/index'
+import { Messenger, CallbacksByEvents, MessengersByCid, MixinRules, MessengerDefinition, tools, extendable, mixins, eventsApi, define, Constructor, MixableConstructor } from './object-plus/index'
 import { ValidationError, Validatable, ChildrenErrors } from './validation'
 import { Traversable, resolveReference } from './traversable'
 
@@ -14,8 +14,13 @@ const { assign } = tools,
 export type TransactionalConstructor = MixableConstructor< Transactional >
 export type TransactionalDefinition = MessengerDefinition
 
-// Transactional object interface
+export enum ItemsBehavior {
+    share       = 0b0001,
+    listen      = 0b0010,
+    persistent  = 0b0100
+}
 
+// Transactional object interface
 @mixins( Messenger )
 @extendable
 export abstract class Transactional implements Messenger, Validatable, Traversable {
@@ -29,17 +34,26 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     static define : (spec? : TransactionalDefinition, statics? : {} ) => MixableConstructor< Transactional >
     static predefine : () => typeof Messenger
 
-    on : (name, callback, context?) => this
-    off : (name? : string, callback? : Function, context? ) => this
-    stopListening : ( obj? : Messenger, name? : string, callback? : Function ) => this
-    listenTo : (obj : Messenger, name, callback? ) => this
-    once : (name, callback, context) => this
-    listenToOnce : (obj : Messenger, name, callback) => this
-    trigger      : (name : string, a?, b?, c? ) => this
+    on : ( events : string | CallbacksByEvents, callback, context? ) => this
+    once : ( events : string | CallbacksByEvents, callback, context? ) => this
+    off : ( events? : string | CallbacksByEvents, callback?, context? ) => this
+    trigger      : (name : string, a?, b?, c?, d?, e? ) => this
+
+    stopListening : ( source? : Messenger, a? : string | CallbacksByEvents, b? : Function ) => this
+    listenTo : ( source : Messenger, a : string | CallbacksByEvents, b? : Function ) => this
+    listenToOnce : ( source : Messenger, a : string | CallbacksByEvents, b? : Function ) => this
 
     _disposed : boolean;
 
+    // State accessor.
+    readonly __inner_state__ : any;
+
+    // Shared modifier (used by collections of shared models)
+    _shared? : number;
+
     dispose() : void {
+        if( this._disposed ) return;
+
         this._owner = void 0;
         this._ownerKey = void 0;
         this.off();
@@ -50,13 +64,10 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     initialize() : void{}
 
     /** @private */
-    _events : eventsApi.EventsSubscription = void 0;
+    _events : eventsApi.HandlersByEvent = void 0;
 
     /** @private */
-    _listeners : Listeners
-
-    /** @private */
-    _listeningTo : ListeningToMap
+    _listeningTo : MessengersByCid
 
     /** @private */
     _localEvents : eventsApi.EventMap
@@ -194,9 +205,9 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     abstract each( iteratee : ( val : any, key : string | number ) => void, context? : any )
 
     // Map members to an array
-    map<T>( iteratee : ( val : any, key : string ) => T, context? : any ) : T[]{
+    map<T>( iteratee : ( val : any, key : string | number ) => T, context? : any ) : T[]{
         const arr : T[] = [],
-              fun = arguments.length === 2 ? ( v, k ) => iteratee.call( context, v, k ) : iteratee;
+              fun = context !== void 0 ? ( v, k ) => iteratee.call( context, v, k ) : iteratee;
 
         this.each( ( val, key ) => {
             const result = fun( val, key );
@@ -209,7 +220,7 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     // Map members to an object
     mapObject<T>( iteratee : ( val : any, key : string | number ) => T, context? : any ) : { [ key : string ] : T }{
         const obj : { [ key : string ] : T } = {},
-            fun = arguments.length === 2 ? ( v, k ) => iteratee.call( context, v, k ) : iteratee;
+            fun = context !== void 0 ? ( v, k ) => iteratee.call( context, v, k ) : iteratee;
 
         this.each( ( val, key ) => {
             const result = iteratee( val, key );
@@ -217,18 +228,6 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
         } );
 
         return obj;
-    }
-
-    // Get array of attribute keys (Record) or record ids (Collection)
-    keys() : string[] {
-        return this.map( ( value, key ) => {
-            if( value !== void 0 ) return key;
-        });
-    }
-
-    // Get array of attribute values (Record) or records (Collection)
-    values() : any[] {
-        return this.map( value => value );
     }
 
     /*********************************
@@ -273,6 +272,18 @@ export abstract class Transactional implements Messenger, Validatable, Traversab
     isValid( key : string ) : boolean {
         return !this.getValidationError( key );
     }
+
+    valueOf(){ return this.cid; }
+    toString(){ return this.cid; }
+
+    // Get class name for an object instance. Works fine with ES6 classes definitions (not in IE).
+    getClassName() : string {
+        const { name } = <any>this.constructor;
+        if( name !== 'Subclass' ) return name;
+    }
+
+    // Logging interface for run time errors and warnings.
+    abstract _log( level : string, text : string, value : any ) : void;
 }
 
 export interface CloneOptions {
@@ -298,7 +309,7 @@ export interface Transaction {
 
     // Send out change events, process update triggers, and close transaction.
     // Nested transactions must be marked with isNested flag (it suppress owner notification).
-    commit( isNested? : boolean )
+    commit( initiator? : Transactional )
 }
 
 // Options for distributed transaction
@@ -358,7 +369,7 @@ export const transactionApi = {
     // Commit transaction. Send out change event and notify owner. Returns true if there were changes.
     // Must be executed for the root transaction only.
     /** @private */
-    commit( object : Transactional, isNested? : boolean ){
+    commit( object : Transactional, initiator? : Transactional ){
         let originalOptions = object._isDirty;
 
         if( originalOptions ){
@@ -366,7 +377,7 @@ export const transactionApi = {
             while( object._isDirty ){
                 const options = object._isDirty;
                 object._isDirty = null;
-                trigger2( object, object._changeEventName, object, options );
+                trigger3( object, object._changeEventName, object, options, initiator );
             }
 
             // Mark transaction as closed.
@@ -374,7 +385,7 @@ export const transactionApi = {
 
             // Notify owner on changes out of transaction scope.
             const { _owner } = object;
-            if( _owner && !isNested ){ // If it's the nested transaction, owner is already aware there are some changes.
+            if( _owner && _owner !== <any> initiator ){ // If it's the nested transaction, owner is already aware there are some changes.
                 _owner._onChildrenChange( object, originalOptions );
             }
         }

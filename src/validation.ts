@@ -1,6 +1,6 @@
 export interface ChildrenErrors {
     [ key : string ] : ValidationError | any
-}
+} 
 
 export interface Validatable {
     _validateNested( errors : ChildrenErrors ) : number;
@@ -10,8 +10,8 @@ export interface Validatable {
 
 // Validation error object.
 export class ValidationError {
-    // Invalid nested object keys
-    nested : ChildrenErrors
+    // Invalid nested object keys 
+    nested : ChildrenErrors 
     length : number
 
     // Local error

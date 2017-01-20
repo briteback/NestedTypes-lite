@@ -10,6 +10,8 @@ export * from './record/index'
 import { Events } from './object-plus/index'
 export const { on, off, trigger, once, listenTo, stopListening, listenToOnce } = Events;
 
+import { Collection } from './collection/index'
+
 // Define synonims for NestedTypes backward compatibility.
 import { Record as Model } from './record/index'
 import { Mixable as Class } from './object-plus/index'
