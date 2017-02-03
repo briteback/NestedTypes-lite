@@ -61,7 +61,30 @@ var createClass = function () {
 
 
 
+var get = function get(object, property, receiver) {
+  if (object === null) object = Function.prototype;
+  var desc = Object.getOwnPropertyDescriptor(object, property);
 
+  if (desc === undefined) {
+    var parent = Object.getPrototypeOf(object);
+
+    if (parent === null) {
+      return undefined;
+    } else {
+      return get(parent, property, receiver);
+    }
+  } else if ("value" in desc) {
+    return desc.value;
+  } else {
+    var getter = desc.get;
+
+    if (getter === undefined) {
+      return undefined;
+    }
+
+    return getter.call(receiver);
+  }
+};
 
 var inherits = function (subClass, superClass) {
   if (typeof superClass !== "function" && superClass !== null) {
@@ -107,45 +130,52 @@ let Log = function () {
         this.reset();
     }
 
-    Log.prototype.doLogging = function doLogging(type, args) {
-        const { logger } = this,
-              logMethod = logger && logger[type];
-        if (logMethod) logMethod.apply(logger, args);
-        if (this.stops[type]) debugger;
-        if (this.throws[type]) throw new Error(`[${ type }] ${ args[0] }`);
-        this.counts[type]++;
-    };
-
-    Log.prototype.reset = function reset() {
-        this.level = 2;
-        this.counts = { error: 0, warn: 0, info: 0, debug: 0 };
-        this.stops = {};
-        return this;
-    };
-
-    Log.prototype.developer = function developer(trueDeveloper) {
-        this.level = 3;
-        this.stops = { error: true, warn: Boolean(trueDeveloper) };
-        return this;
-    };
-
-    Log.prototype.error = function error(...args) {
-        if (this.level > 0) this.doLogging('error', args);
-    };
-
-    Log.prototype.warn = function warn(...args) {
-        if (this.level > 1) this.doLogging('warn', args);
-    };
-
-    Log.prototype.info = function info(...args) {
-        if (this.level > 2) this.doLogging('info', args);
-    };
-
-    Log.prototype.debug = function debug(...args) {
-        if (this.level > 3) this.doLogging('debug', args);
-    };
-
     createClass(Log, [{
+        key: 'doLogging',
+        value: function doLogging(type, args) {
+            const { logger } = this,
+                  logMethod = logger && logger[type];
+            if (logMethod) logMethod.apply(logger, args);
+            if (this.stops[type]) debugger;
+            if (this.throws[type]) throw new Error(`[${ type }] ${ args[0] }`);
+            this.counts[type]++;
+        }
+    }, {
+        key: 'reset',
+        value: function reset() {
+            this.level = 2;
+            this.counts = { error: 0, warn: 0, info: 0, debug: 0 };
+            this.stops = {};
+            return this;
+        }
+    }, {
+        key: 'developer',
+        value: function developer(trueDeveloper) {
+            this.level = 3;
+            this.stops = { error: true, warn: Boolean(trueDeveloper) };
+            return this;
+        }
+    }, {
+        key: 'error',
+        value: function error(...args) {
+            if (this.level > 0) this.doLogging('error', args);
+        }
+    }, {
+        key: 'warn',
+        value: function warn(...args) {
+            if (this.level > 1) this.doLogging('warn', args);
+        }
+    }, {
+        key: 'info',
+        value: function info(...args) {
+            if (this.level > 2) this.doLogging('info', args);
+        }
+    }, {
+        key: 'debug',
+        value: function debug(...args) {
+            if (this.level > 3) this.doLogging('debug', args);
+        }
+    }, {
         key: 'state',
         get: function () {
             return `
@@ -396,94 +426,103 @@ let Mixable = function () {
         this.initialize.apply(this, arguments);
     }
 
-    Mixable.prototype.initialize = function initialize() {};
-
-    Mixable.create = function create(a, b) {
-        return new this(a, b);
-    };
-
-    Mixable.mixins = function mixins(..._mixins) {
-        const proto = this.prototype,
-              mergeRules = this._mixinRules || {},
-              _appliedMixins = this._appliedMixins = (this._appliedMixins || []).slice();
-        for (let mixin of _mixins) {
-            if (mixin instanceof Array) {
-                return Mixable.mixins.apply(this, mixin);
+    createClass(Mixable, [{
+        key: 'initialize',
+        value: function initialize() {}
+    }], [{
+        key: 'create',
+        value: function create(a, b) {
+            return new this(a, b);
+        }
+    }, {
+        key: 'mixins',
+        value: function mixins(..._mixins) {
+            const proto = this.prototype,
+                  mergeRules = this._mixinRules || {},
+                  _appliedMixins = this._appliedMixins = (this._appliedMixins || []).slice();
+            for (let mixin of _mixins) {
+                if (mixin instanceof Array) {
+                    return Mixable.mixins.apply(this, mixin);
+                }
+                if (_appliedMixins.indexOf(mixin) >= 0) continue;
+                _appliedMixins.push(mixin);
+                if (typeof mixin === 'function') {
+                    defaults$$1(this, mixin);
+                    mergeProps(proto, mixin.prototype, mergeRules);
+                } else {
+                    mergeProps(proto, mixin, mergeRules);
+                }
             }
-            if (_appliedMixins.indexOf(mixin) >= 0) continue;
-            _appliedMixins.push(mixin);
-            if (typeof mixin === 'function') {
-                defaults$$1(this, mixin);
-                mergeProps(proto, mixin.prototype, mergeRules);
-            } else {
-                mergeProps(proto, mixin, mergeRules);
-            }
-        }
-        return this;
-    };
-
-    Mixable.mixTo = function mixTo(...args) {
-        for (let Ctor of args) {
-            Mixable.mixins.call(Ctor, this);
-        }
-        return this;
-    };
-
-    Mixable.mixinRules = function mixinRules(_mixinRules) {
-        const Base = Object.getPrototypeOf(this.prototype).constructor;
-        if (Base._mixinRules) {
-            mergeProps(_mixinRules, Base._mixinRules);
-        }
-        this._mixinRules = _mixinRules;
-        return this;
-    };
-
-    Mixable.define = function define(definition = {}, staticProps) {
-        if (!this.define) {
-            log.error("[Class Defininition] Class must have class extensions to use @define decorator. Use '@extendable' before @define, or extend the base class with class extensions.", definition);
             return this;
         }
-        this.predefine();
-        const proto = this.prototype;
-        const protoProps = omit(definition, 'properties', 'mixins', 'mixinRules'),
-              { properties = {}, mixins, mixinRules } = definition;
-        assign(proto, protoProps);
-        assign(this, staticProps);
-        properties && Object.defineProperties(proto, transform({}, properties, toPropertyDescriptor));
-        mixinRules && this.mixinRules(mixinRules);
-        mixins && this.mixins(mixins);
-        return this;
-    };
-
-    Mixable.extend = function extend(spec, statics) {
-        let Subclass;
-        if (spec && spec.hasOwnProperty('constructor')) {
-            Subclass = spec.constructor;
-            __extends(Subclass, this);
-        } else {
-            Subclass = function (_ref) {
-                inherits(_Subclass, _ref);
-
-                function _Subclass() {
-                    classCallCheck(this, _Subclass);
-                    return possibleConstructorReturn(this, _ref.apply(this, arguments));
-                }
-
-                return _Subclass;
-            }(this);
+    }, {
+        key: 'mixTo',
+        value: function mixTo(...args) {
+            for (let Ctor of args) {
+                Mixable.mixins.call(Ctor, this);
+            }
+            return this;
         }
-        return spec ? Subclass.define(spec, statics) : Subclass.predefine();
-    };
-
-    Mixable.predefine = function predefine() {
-        const BaseClass = getBaseClass(this);
-        if (BaseClass.create === this.create) {
-            this.create = Mixable.create;
+    }, {
+        key: 'mixinRules',
+        value: function mixinRules(_mixinRules) {
+            const Base = Object.getPrototypeOf(this.prototype).constructor;
+            if (Base._mixinRules) {
+                mergeProps(_mixinRules, Base._mixinRules);
+            }
+            this._mixinRules = _mixinRules;
+            return this;
         }
-        this.__super__ = BaseClass.prototype;
-        return this;
-    };
+    }, {
+        key: 'define',
+        value: function define(definition = {}, staticProps) {
+            if (!this.define) {
+                log.error("[Class Defininition] Class must have class extensions to use @define decorator. Use '@extendable' before @define, or extend the base class with class extensions.", definition);
+                return this;
+            }
+            this.predefine();
+            const proto = this.prototype;
+            const protoProps = omit(definition, 'properties', 'mixins', 'mixinRules'),
+                  { properties = {}, mixins, mixinRules } = definition;
+            assign(proto, protoProps);
+            assign(this, staticProps);
+            properties && Object.defineProperties(proto, transform({}, properties, toPropertyDescriptor));
+            mixinRules && this.mixinRules(mixinRules);
+            mixins && this.mixins(mixins);
+            return this;
+        }
+    }, {
+        key: 'extend',
+        value: function extend(spec, statics) {
+            let Subclass;
+            if (spec && spec.hasOwnProperty('constructor')) {
+                Subclass = spec.constructor;
+                __extends(Subclass, this);
+            } else {
+                Subclass = function (_ref) {
+                    inherits(_Subclass, _ref);
 
+                    function _Subclass() {
+                        classCallCheck(this, _Subclass);
+                        return possibleConstructorReturn(this, (_Subclass.__proto__ || Object.getPrototypeOf(_Subclass)).apply(this, arguments));
+                    }
+
+                    return _Subclass;
+                }(this);
+            }
+            return spec ? Subclass.define(spec, statics) : Subclass.predefine();
+        }
+    }, {
+        key: 'predefine',
+        value: function predefine() {
+            const BaseClass = getBaseClass(this);
+            if (BaseClass.create === this.create) {
+                this.create = Mixable.create;
+            }
+            this.__super__ = BaseClass.prototype;
+            return this;
+        }
+    }]);
     return Mixable;
 }();
 
@@ -606,41 +645,48 @@ let EventMap = function () {
         }
     }
 
-    EventMap.prototype.merge = function merge(map) {
-        this.handlers = this.handlers.concat(map.handlers);
-    };
-
-    EventMap.prototype.addEventsMap = function addEventsMap(map) {
-        for (let names in map) {
-            this.addEvent(names, map[names]);
+    createClass(EventMap, [{
+        key: 'merge',
+        value: function merge(map) {
+            this.handlers = this.handlers.concat(map.handlers);
         }
-    };
-
-    EventMap.prototype.bubbleEvents = function bubbleEvents(names) {
-        for (let name of names.split(eventSplitter$1)) {
-            this.addEvent(name, getBubblingHandler(name));
+    }, {
+        key: 'addEventsMap',
+        value: function addEventsMap(map) {
+            for (let names in map) {
+                this.addEvent(names, map[names]);
+            }
         }
-    };
-
-    EventMap.prototype.addEvent = function addEvent(names, callback) {
-        const { handlers } = this;
-        for (let name of names.split(eventSplitter$1)) {
-            handlers.push(new EventDescriptor(name, callback));
+    }, {
+        key: 'bubbleEvents',
+        value: function bubbleEvents(names) {
+            for (let name of names.split(eventSplitter$1)) {
+                this.addEvent(name, getBubblingHandler(name));
+            }
         }
-    };
-
-    EventMap.prototype.subscribe = function subscribe(target, source) {
-        for (let event of this.handlers) {
-            on$1(source, event.name, event.callback, target);
+    }, {
+        key: 'addEvent',
+        value: function addEvent(names, callback) {
+            const { handlers } = this;
+            for (let name of names.split(eventSplitter$1)) {
+                handlers.push(new EventDescriptor(name, callback));
+            }
         }
-    };
-
-    EventMap.prototype.unsubscribe = function unsubscribe(target, source) {
-        for (let event of this.handlers) {
-            off$1(source, event.name, event.callback, target);
+    }, {
+        key: 'subscribe',
+        value: function subscribe(target, source) {
+            for (let event of this.handlers) {
+                on$1(source, event.name, event.callback, target);
+            }
         }
-    };
-
+    }, {
+        key: 'unsubscribe',
+        value: function unsubscribe(target, source) {
+            for (let event of this.handlers) {
+                off$1(source, event.name, event.callback, target);
+            }
+        }
+    }]);
     return EventMap;
 }();
 
@@ -811,84 +857,95 @@ let Messenger = Messenger_1 = function () {
         this.initialize.apply(this, arguments);
     }
 
-    Messenger.prototype.initialize = function initialize() {};
-
-    Messenger.define = function define$$1(protoProps, staticProps) {
-        const spec = omit(protoProps || {}, 'localEvents');
-        if (protoProps) {
-            const { localEvents, _localEvents } = protoProps;
-            if (localEvents || _localEvents) {
-                const eventsMap = new EventMap(this.prototype._localEvents);
-                localEvents && eventsMap.addEventsMap(localEvents);
-                _localEvents && eventsMap.merge(_localEvents);
-                spec._localEvents = eventsMap;
+    createClass(Messenger, [{
+        key: "initialize",
+        value: function initialize() {}
+    }, {
+        key: "on",
+        value: function on$$1(events, callback, context) {
+            if (typeof events === 'string') strings$$1(_on, this, events, callback, context);else for (let name in events) strings$$1(_on, this, name, events[name], context || callback);
+            return this;
+        }
+    }, {
+        key: "once",
+        value: function once$$1(events, callback, context) {
+            if (typeof events === 'string') strings$$1(_once, this, events, callback, context);else for (let name in events) strings$$1(_once, this, name, events[name], context || callback);
+            return this;
+        }
+    }, {
+        key: "off",
+        value: function off$$1(events, callback, context) {
+            if (!events) _off(this, void 0, callback, context);else if (typeof events === 'string') strings$$1(_off, this, events, callback, context);else for (let name in events) strings$$1(_off, this, name, events[name], context || callback);
+            return this;
+        }
+    }, {
+        key: "trigger",
+        value: function trigger(name, a, b, c, d, e) {
+            if (d !== void 0 || e !== void 0) trigger5$$1(this, name, a, b, c, d, e);else if (c !== void 0) trigger3$$1(this, name, a, b, c);else trigger2$$1(this, name, a, b);
+            return this;
+        }
+    }, {
+        key: "listenTo",
+        value: function listenTo(source, a, b) {
+            if (source) {
+                addReference(this, source);
+                source.on(a, !b && typeof a === 'object' ? this : b, this);
             }
+            return this;
         }
-        return Mixable.define.call(this, spec, staticProps);
-    };
-
-    Messenger.prototype.on = function on$$1(events, callback, context) {
-        if (typeof events === 'string') strings$$1(_on, this, events, callback, context);else for (let name in events) strings$$1(_on, this, name, events[name], context || callback);
-        return this;
-    };
-
-    Messenger.prototype.once = function once$$1(events, callback, context) {
-        if (typeof events === 'string') strings$$1(_once, this, events, callback, context);else for (let name in events) strings$$1(_once, this, name, events[name], context || callback);
-        return this;
-    };
-
-    Messenger.prototype.off = function off$$1(events, callback, context) {
-        if (!events) _off(this, void 0, callback, context);else if (typeof events === 'string') strings$$1(_off, this, events, callback, context);else for (let name in events) strings$$1(_off, this, name, events[name], context || callback);
-        return this;
-    };
-
-    Messenger.prototype.trigger = function trigger(name, a, b, c, d, e) {
-        if (d !== void 0 || e !== void 0) trigger5$$1(this, name, a, b, c, d, e);else if (c !== void 0) trigger3$$1(this, name, a, b, c);else trigger2$$1(this, name, a, b);
-        return this;
-    };
-
-    Messenger.prototype.listenTo = function listenTo(source, a, b) {
-        if (source) {
-            addReference(this, source);
-            source.on(a, !b && typeof a === 'object' ? this : b, this);
+    }, {
+        key: "listenToOnce",
+        value: function listenToOnce(source, a, b) {
+            if (source) {
+                addReference(this, source);
+                source.once(a, !b && typeof a === 'object' ? this : b, this);
+            }
+            return this;
         }
-        return this;
-    };
-
-    Messenger.prototype.listenToOnce = function listenToOnce(source, a, b) {
-        if (source) {
-            addReference(this, source);
-            source.once(a, !b && typeof a === 'object' ? this : b, this);
-        }
-        return this;
-    };
-
-    Messenger.prototype.stopListening = function stopListening(a_source, a, b) {
-        const { _listeningTo } = this;
-        if (_listeningTo) {
-            const removeAll = !(a || b),
-                  second = !b && typeof a === 'object' ? this : b;
-            if (a_source) {
-                const source = _listeningTo[a_source.cid];
-                if (source) {
-                    if (removeAll) delete _listeningTo[a_source.cid];
-                    source.off(a, second, this);
+    }, {
+        key: "stopListening",
+        value: function stopListening(a_source, a, b) {
+            const { _listeningTo } = this;
+            if (_listeningTo) {
+                const removeAll = !(a || b),
+                      second = !b && typeof a === 'object' ? this : b;
+                if (a_source) {
+                    const source = _listeningTo[a_source.cid];
+                    if (source) {
+                        if (removeAll) delete _listeningTo[a_source.cid];
+                        source.off(a, second, this);
+                    }
+                } else if (a_source == null) {
+                    for (let cid in _listeningTo) _listeningTo[cid].off(a, second, this);
+                    if (removeAll) this._listeningTo = void 0;
                 }
-            } else if (a_source == null) {
-                for (let cid in _listeningTo) _listeningTo[cid].off(a, second, this);
-                if (removeAll) this._listeningTo = void 0;
             }
+            return this;
         }
-        return this;
-    };
-
-    Messenger.prototype.dispose = function dispose() {
-        if (this._disposed) return;
-        this.stopListening();
-        this.off();
-        this._disposed = true;
-    };
-
+    }, {
+        key: "dispose",
+        value: function dispose() {
+            if (this._disposed) return;
+            this.stopListening();
+            this.off();
+            this._disposed = true;
+        }
+    }], [{
+        key: "define",
+        value: function define$$1(protoProps, staticProps) {
+            const spec = omit(protoProps || {}, 'localEvents');
+            if (protoProps) {
+                const { localEvents, _localEvents } = protoProps;
+                if (localEvents || _localEvents) {
+                    const eventsMap = new EventMap(this.prototype._localEvents);
+                    localEvents && eventsMap.addEventsMap(localEvents);
+                    _localEvents && eventsMap.merge(_localEvents);
+                    spec._localEvents = eventsMap;
+                }
+            }
+            return Mixable.define.call(this, spec, staticProps);
+        }
+    }]);
     return Messenger;
 }();
 Messenger = Messenger_1 = __decorate([extendable$1], Messenger);
@@ -914,24 +971,27 @@ let ValidationError = function () {
         }
     }
 
-    ValidationError.prototype.each = function each(iteratee) {
-        const { error, nested } = this;
-        if (error) iteratee(error, null);
-        for (const key in nested) {
-            iteratee(nested[key], key);
-        }
-    };
-
-    ValidationError.prototype.eachError = function eachError(iteratee, object) {
-        this.each((value, key) => {
-            if (value instanceof ValidationError) {
-                value.eachError(iteratee, object.get(key));
-            } else {
-                iteratee(value, key, object);
+    createClass(ValidationError, [{
+        key: "each",
+        value: function each(iteratee) {
+            const { error, nested } = this;
+            if (error) iteratee(error, null);
+            for (const key in nested) {
+                iteratee(nested[key], key);
             }
-        });
-    };
-
+        }
+    }, {
+        key: "eachError",
+        value: function eachError(iteratee, object) {
+            this.each((value, key) => {
+                if (value instanceof ValidationError) {
+                    value.eachError(iteratee, object.get(key));
+                } else {
+                    iteratee(value, key, object);
+                }
+            });
+        }
+    }]);
     return ValidationError;
 }();
 
@@ -998,120 +1058,142 @@ let Transactional = function () {
         this.cid = this.cidPrefix + cid;
     }
 
-    Transactional.prototype.dispose = function dispose() {
-        if (this._disposed) return;
-        this._owner = void 0;
-        this._ownerKey = void 0;
-        this.off();
-        this.stopListening();
-        this._disposed = true;
-    };
-
-    Transactional.prototype.initialize = function initialize() {};
-
-    Transactional.prototype.onChanges = function onChanges(handler, target) {
-        on$3(this, this._changeEventName, handler, target);
-    };
-
-    Transactional.prototype.offChanges = function offChanges(handler, target) {
-        off$3(this, this._changeEventName, handler, target);
-    };
-
-    Transactional.prototype.listenToChanges = function listenToChanges(target, handler) {
-        this.listenTo(target, target._changeEventName, handler);
-    };
-
-    Transactional.prototype.transaction = function transaction(fun, options = {}) {
-        const isRoot = transactionApi.begin(this);
-        fun.call(this, this);
-        isRoot && transactionApi.commit(this);
-    };
-
-    Transactional.prototype.updateEach = function updateEach(iteratee, options) {
-        const isRoot = transactionApi.begin(this);
-        this.each(iteratee);
-        isRoot && transactionApi.commit(this);
-    };
-
-    Transactional.prototype.set = function set$$1(values, options) {
-        if (values) {
-            const transaction = this._createTransaction(values, options);
-            transaction && transaction.commit();
-        }
-        return this;
-    };
-
-    Transactional.prototype.parse = function parse(data, options) {
-        return data;
-    };
-
-    Transactional.prototype.deepGet = function deepGet(reference) {
-        return resolveReference(this, reference, (object, key) => object.get ? object.get(key) : object[key]);
-    };
-
-    Transactional.prototype.getOwner = function getOwner() {
-        return this._owner;
-    };
-
-    Transactional.prototype.getStore = function getStore() {
-        const { _owner } = this;
-        return _owner ? _owner.getStore() : this._defaultStore;
-    };
-
-    Transactional.prototype.map = function map(iteratee, context) {
-        const arr = [],
-              fun = context !== void 0 ? (v, k) => iteratee.call(context, v, k) : iteratee;
-        this.each((val, key) => {
-            const result = fun(val, key);
-            if (result !== void 0) arr.push(result);
-        });
-        return arr;
-    };
-
-    Transactional.prototype.mapObject = function mapObject(iteratee, context) {
-        const obj = {},
-              fun = context !== void 0 ? (v, k) => iteratee.call(context, v, k) : iteratee;
-        this.each((val, key) => {
-            const result = iteratee(val, key);
-            if (result !== void 0) obj[key] = result;
-        });
-        return obj;
-    };
-
-    Transactional.prototype.validate = function validate(obj) {};
-
-    Transactional.prototype.getValidationError = function getValidationError(key) {
-        var error = this.validationError;
-        return (key ? error && error.nested[key] : error) || null;
-    };
-
-    Transactional.prototype.deepValidationError = function deepValidationError(reference) {
-        return resolveReference(this, reference, (object, key) => object.getValidationError(key));
-    };
-
-    Transactional.prototype.eachValidationError = function eachValidationError(iteratee) {
-        const { validationError } = this;
-        validationError && validationError.eachError(iteratee, this);
-    };
-
-    Transactional.prototype.isValid = function isValid(key) {
-        return !this.getValidationError(key);
-    };
-
-    Transactional.prototype.valueOf = function valueOf() {
-        return this.cid;
-    };
-
-    Transactional.prototype.toString = function toString() {
-        return this.cid;
-    };
-
-    Transactional.prototype.getClassName = function getClassName() {
-        const { name } = this.constructor;
-        if (name !== 'Subclass') return name;
-    };
-
     createClass(Transactional, [{
+        key: "dispose",
+        value: function dispose() {
+            if (this._disposed) return;
+            this._owner = void 0;
+            this._ownerKey = void 0;
+            this.off();
+            this.stopListening();
+            this._disposed = true;
+        }
+    }, {
+        key: "initialize",
+        value: function initialize() {}
+    }, {
+        key: "onChanges",
+        value: function onChanges(handler, target) {
+            on$3(this, this._changeEventName, handler, target);
+        }
+    }, {
+        key: "offChanges",
+        value: function offChanges(handler, target) {
+            off$3(this, this._changeEventName, handler, target);
+        }
+    }, {
+        key: "listenToChanges",
+        value: function listenToChanges(target, handler) {
+            this.listenTo(target, target._changeEventName, handler);
+        }
+    }, {
+        key: "transaction",
+        value: function transaction(fun, options = {}) {
+            const isRoot = transactionApi.begin(this);
+            fun.call(this, this);
+            isRoot && transactionApi.commit(this);
+        }
+    }, {
+        key: "updateEach",
+        value: function updateEach(iteratee, options) {
+            const isRoot = transactionApi.begin(this);
+            this.each(iteratee);
+            isRoot && transactionApi.commit(this);
+        }
+    }, {
+        key: "set",
+        value: function set$$1(values, options) {
+            if (values) {
+                const transaction = this._createTransaction(values, options);
+                transaction && transaction.commit();
+            }
+            return this;
+        }
+    }, {
+        key: "parse",
+        value: function parse(data, options) {
+            return data;
+        }
+    }, {
+        key: "deepGet",
+        value: function deepGet(reference) {
+            return resolveReference(this, reference, (object, key) => object.get ? object.get(key) : object[key]);
+        }
+    }, {
+        key: "getOwner",
+        value: function getOwner() {
+            return this._owner;
+        }
+    }, {
+        key: "getStore",
+        value: function getStore() {
+            const { _owner } = this;
+            return _owner ? _owner.getStore() : this._defaultStore;
+        }
+    }, {
+        key: "map",
+        value: function map(iteratee, context) {
+            const arr = [],
+                  fun = context !== void 0 ? (v, k) => iteratee.call(context, v, k) : iteratee;
+            this.each((val, key) => {
+                const result = fun(val, key);
+                if (result !== void 0) arr.push(result);
+            });
+            return arr;
+        }
+    }, {
+        key: "mapObject",
+        value: function mapObject(iteratee, context) {
+            const obj = {},
+                  fun = context !== void 0 ? (v, k) => iteratee.call(context, v, k) : iteratee;
+            this.each((val, key) => {
+                const result = iteratee(val, key);
+                if (result !== void 0) obj[key] = result;
+            });
+            return obj;
+        }
+    }, {
+        key: "validate",
+        value: function validate(obj) {}
+    }, {
+        key: "getValidationError",
+        value: function getValidationError(key) {
+            var error = this.validationError;
+            return (key ? error && error.nested[key] : error) || null;
+        }
+    }, {
+        key: "deepValidationError",
+        value: function deepValidationError(reference) {
+            return resolveReference(this, reference, (object, key) => object.getValidationError(key));
+        }
+    }, {
+        key: "eachValidationError",
+        value: function eachValidationError(iteratee) {
+            const { validationError } = this;
+            validationError && validationError.eachError(iteratee, this);
+        }
+    }, {
+        key: "isValid",
+        value: function isValid(key) {
+            return !this.getValidationError(key);
+        }
+    }, {
+        key: "valueOf",
+        value: function valueOf() {
+            return this.cid;
+        }
+    }, {
+        key: "toString",
+        value: function toString() {
+            return this.cid;
+        }
+    }, {
+        key: "getClassName",
+        value: function getClassName() {
+            const { name } = this.constructor;
+            if (name !== 'Subclass') return name;
+        }
+    }, {
         key: "validationError",
         get: function () {
             const error = this._validationError || (this._validationError = new ValidationError(this));
@@ -1185,7 +1267,7 @@ let Record = Record_1 = function (_Transactional) {
     function Record(a_values, a_options) {
         classCallCheck(this, Record);
 
-        var _this = possibleConstructorReturn(this, _Transactional.call(this, _cidCounter++));
+        var _this = possibleConstructorReturn(this, (Record.__proto__ || Object.getPrototypeOf(Record)).call(this, _cidCounter++));
 
         _this.attributes = {};
         const options = a_options || {},
@@ -1201,283 +1283,308 @@ let Record = Record_1 = function (_Transactional) {
         return _this;
     }
 
-    Record.define = function define$$1(protoProps, staticProps) {
-        return Transactional.define(protoProps, staticProps);
-    };
-
-    Record.defaults = function defaults$$1(attrs) {
-        return this.extend({ attributes: attrs });
-    };
-
-    Record.prototype.previousAttributes = function previousAttributes() {
-        return new this.Attributes(this._previousAttributes);
-    };
-
-    Record.prototype.changedAttributes = function changedAttributes(diff) {
-        if (!diff) return this.hasChanged() ? assign$4({}, this.changed) : false;
-        var val,
-            changed = false,
-            old = this._transaction ? this._previousAttributes : this.attributes,
-            attrSpecs = this._attributes;
-        for (var attr in diff) {
-            if (!attrSpecs[attr].isChanged(old[attr], val = diff[attr])) continue;
-            (changed || (changed = {}))[attr] = val;
+    createClass(Record, [{
+        key: "previousAttributes",
+        value: function previousAttributes() {
+            return new this.Attributes(this._previousAttributes);
         }
-        return changed;
-    };
-
-    Record.prototype.hasChanged = function hasChanged(key) {
-        const { _previousAttributes } = this;
-        if (!_previousAttributes) return false;
-        return key ? this._attributes[key].isChanged(this.attributes[key], _previousAttributes[key]) : !isEmpty$1(this.changed);
-    };
-
-    Record.prototype.previous = function previous(key) {
-        if (key) {
+    }, {
+        key: "changedAttributes",
+        value: function changedAttributes(diff) {
+            if (!diff) return this.hasChanged() ? assign$4({}, this.changed) : false;
+            var val,
+                changed = false,
+                old = this._transaction ? this._previousAttributes : this.attributes,
+                attrSpecs = this._attributes;
+            for (var attr in diff) {
+                if (!attrSpecs[attr].isChanged(old[attr], val = diff[attr])) continue;
+                (changed || (changed = {}))[attr] = val;
+            }
+            return changed;
+        }
+    }, {
+        key: "hasChanged",
+        value: function hasChanged(key) {
             const { _previousAttributes } = this;
-            if (_previousAttributes) return _previousAttributes[key];
+            if (!_previousAttributes) return false;
+            return key ? this._attributes[key].isChanged(this.attributes[key], _previousAttributes[key]) : !isEmpty$1(this.changed);
         }
-        return null;
-    };
-
-    Record.prototype.isNew = function isNew() {
-        return this.id == null;
-    };
-
-    Record.prototype.has = function has(key) {
-        return this[key] != void 0;
-    };
-
-    Record.prototype.unset = function unset(key, options) {
-        this.set(key, void 0, options);
-        return this;
-    };
-
-    Record.prototype.clear = function clear(options) {
-        const nullify = options && options.nullify;
-        this.transaction(() => {
-            this.forEachAttr(this.attributes, (value, key) => this[key] = nullify ? null : void 0);
-        }, options);
-        return this;
-    };
-
-    Record.prototype.getOwner = function getOwner() {
-        const owner = this._owner;
-        return this._ownerKey ? owner : owner && owner._owner;
-    };
-
-    Record.prototype.Attributes = function Attributes(x) {
-        this.id = x.id;
-    };
-
-    Record.prototype.forEachAttr = function forEachAttr(attrs, iteratee) {
-        const { _attributes } = this;
-        let unknown;
-        for (let name in attrs) {
-            const spec = _attributes[name];
-            if (spec) {
-                iteratee(attrs[name], name, spec);
-            } else {
-                unknown || (unknown = []);
-                unknown.push(`'${ name }'`);
+    }, {
+        key: "previous",
+        value: function previous(key) {
+            if (key) {
+                const { _previousAttributes } = this;
+                if (_previousAttributes) return _previousAttributes[key];
             }
+            return null;
         }
-        if (unknown) {
-            this._log('warn', `attributes ${ unknown.join(', ') } are not defined`, attrs);
+    }, {
+        key: "isNew",
+        value: function isNew() {
+            return this.id == null;
         }
-    };
-
-    Record.prototype.each = function each(iteratee, context) {
-        const fun = context !== void 0 ? (v, k) => iteratee.call(context, v, k) : iteratee,
-              { attributes, _keys } = this;
-        for (const key of _keys) {
-            const value = attributes[key];
-            if (value !== void 0) fun(value, key);
+    }, {
+        key: "has",
+        value: function has(key) {
+            return this[key] != void 0;
         }
-    };
-
-    Record.prototype.keys = function keys() {
-        return this.map((value, key) => {
-            if (value !== void 0) return key;
-        });
-    };
-
-    Record.prototype.values = function values() {
-        return this.map(value => value);
-    };
-
-    Record.prototype._toJSON = function _toJSON() {
-        return {};
-    };
-
-    Record.prototype._parse = function _parse(data) {
-        return data;
-    };
-
-    Record.prototype.defaults = function defaults$$1(values) {
-        return {};
-    };
-
-    Record.prototype.initialize = function initialize(values, options) {};
-
-    Record.prototype.clone = function clone(options = {}) {
-        const copy = new this.constructor(this.attributes, { clone: true });
-        if (options.pinStore) copy._defaultStore = this.getStore();
-        return copy;
-    };
-
-    Record.prototype.deepClone = function deepClone() {
-        return this.clone();
-    };
-
-    Record.prototype._validateNested = function _validateNested(errors) {
-        var length = 0;
-        this.forEachAttr(this.attributes, (value, name, attribute) => {
-            const error = attribute.validate(this, value, name);
-            if (error) {
-                errors[name] = error;
-                length++;
-            }
-        });
-        return length;
-    };
-
-    Record.prototype.get = function get$$1(key) {
-        return this[key];
-    };
-
-    Record.prototype.toJSON = function toJSON() {
-        const json = {};
-        this.forEachAttr(this.attributes, (value, key, { toJSON }) => {
-            if (value !== void 0) {
-                const asJson = toJSON.call(this, value, key);
-                if (asJson !== void 0) json[key] = asJson;
-            }
-        });
-        return json;
-    };
-
-    Record.prototype.parse = function parse(data, options) {
-        return this._parse(data);
-    };
-
-    Record.prototype.set = function set$$1(a, b, c) {
-        if (typeof a === 'string') {
-            if (c) {
-                return _Transactional.prototype.set.call(this, { [a]: b }, c);
-            } else {
-                setAttribute(this, a, b);
-                return this;
-            }
-        } else {
-            return _Transactional.prototype.set.call(this, a, b);
+    }, {
+        key: "unset",
+        value: function unset(key, options) {
+            this.set(key, void 0, options);
+            return this;
         }
-    };
-
-    Record.prototype.deepSet = function deepSet(name, value, options) {
-        this.transaction(() => {
-            const path = name.split('.'),
-                  l = path.length - 1,
-                  attr = path[l];
-            let model = this;
-            for (let i = 0; i < l; i++) {
-                const key = path[i];
-                let next = model.get ? model.get(key) : model[key];
-                if (!next) {
-                    const attrSpecs = model._attributes;
-                    if (attrSpecs) {
-                        var newModel = attrSpecs[key].create();
-                        if (options && options.nullify && newModel._attributes) {
-                            newModel.clear(options);
-                        }
-                        model[key] = next = newModel;
-                    } else return;
+    }, {
+        key: "clear",
+        value: function clear(options) {
+            const nullify = options && options.nullify;
+            this.transaction(() => {
+                this.forEachAttr(this.attributes, (value, key) => this[key] = nullify ? null : void 0);
+            }, options);
+            return this;
+        }
+    }, {
+        key: "getOwner",
+        value: function getOwner() {
+            const owner = this._owner;
+            return this._ownerKey ? owner : owner && owner._owner;
+        }
+    }, {
+        key: "Attributes",
+        value: function Attributes(x) {
+            this.id = x.id;
+        }
+    }, {
+        key: "forEachAttr",
+        value: function forEachAttr(attrs, iteratee) {
+            const { _attributes } = this;
+            let unknown;
+            for (let name in attrs) {
+                const spec = _attributes[name];
+                if (spec) {
+                    iteratee(attrs[name], name, spec);
+                } else {
+                    unknown || (unknown = []);
+                    unknown.push(`'${ name }'`);
                 }
-                model = next;
             }
-            if (model.set) {
-                model.set(attr, value, options);
-            } else {
-                model[attr] = value;
+            if (unknown) {
+                this._log('warn', `attributes ${ unknown.join(', ') } are not defined`, attrs);
             }
-        });
-        return this;
-    };
-
-    Record.prototype.transaction = function transaction(fun, options = {}) {
-        const isRoot = begin$1(this);
-        fun.call(this, this);
-        isRoot && _commit(this);
-    };
-
-    Record.prototype._createTransaction = function _createTransaction(a_values, options = {}) {
-        const isRoot = begin$1(this),
-              changes = [],
-              nested = [],
-              { attributes } = this,
-              values = options.parse ? this.parse(a_values, options) : a_values;
-        if (values && values.constructor === Object) {
-            this.forEachAttr(values, (value, key, attr) => {
-                const prev = attributes[key];
-                let update;
-                if (update = attr.canBeUpdated(prev, value, options)) {
-                    const nestedTransaction = prev._createTransaction(update, options);
-                    if (nestedTransaction) {
-                        nested.push(nestedTransaction);
-                        if (attr.propagateChanges) changes.push(key);
-                    }
-                    return;
-                }
-                const next = attr.transform(value, options, prev, this);
-                attributes[key] = next;
-                if (attr.isChanged(next, prev)) {
-                    changes.push(key);
-                    attr.handleChange(next, prev, this);
+        }
+    }, {
+        key: "each",
+        value: function each(iteratee, context) {
+            const fun = context !== void 0 ? (v, k) => iteratee.call(context, v, k) : iteratee,
+                  { attributes, _keys } = this;
+            for (const key of _keys) {
+                const value = attributes[key];
+                if (value !== void 0) fun(value, key);
+            }
+        }
+    }, {
+        key: "keys",
+        value: function keys() {
+            return this.map((value, key) => {
+                if (value !== void 0) return key;
+            });
+        }
+    }, {
+        key: "values",
+        value: function values() {
+            return this.map(value => value);
+        }
+    }, {
+        key: "_toJSON",
+        value: function _toJSON() {
+            return {};
+        }
+    }, {
+        key: "_parse",
+        value: function _parse(data) {
+            return data;
+        }
+    }, {
+        key: "defaults",
+        value: function defaults$$1(values) {
+            return {};
+        }
+    }, {
+        key: "initialize",
+        value: function initialize(values, options) {}
+    }, {
+        key: "clone",
+        value: function clone(options = {}) {
+            const copy = new this.constructor(this.attributes, { clone: true });
+            if (options.pinStore) copy._defaultStore = this.getStore();
+            return copy;
+        }
+    }, {
+        key: "deepClone",
+        value: function deepClone() {
+            return this.clone();
+        }
+    }, {
+        key: "_validateNested",
+        value: function _validateNested(errors) {
+            var length = 0;
+            this.forEachAttr(this.attributes, (value, name, attribute) => {
+                const error = attribute.validate(this, value, name);
+                if (error) {
+                    errors[name] = error;
+                    length++;
                 }
             });
-        } else {
-            this._log('error', 'incompatible argument type', values);
+            return length;
         }
-        if (changes.length && markAsDirty$1(this, options)) {
-            return new RecordTransaction(this, isRoot, nested, changes);
+    }, {
+        key: "get",
+        value: function get$$1(key) {
+            return this[key];
         }
-        for (let pendingTransaction of nested) {
-            pendingTransaction.commit(this);
+    }, {
+        key: "toJSON",
+        value: function toJSON() {
+            const json = {};
+            this.forEachAttr(this.attributes, (value, key, { toJSON }) => {
+                if (value !== void 0) {
+                    const asJson = toJSON.call(this, value, key);
+                    if (asJson !== void 0) json[key] = asJson;
+                }
+            });
+            return json;
         }
-        isRoot && _commit(this);
-    };
-
-    Record.prototype._onChildrenChange = function _onChildrenChange(child, options) {
-        const { _ownerKey } = child,
-              attribute = this._attributes[_ownerKey];
-        if (!attribute || attribute.propagateChanges) this.forceAttributeChange(_ownerKey, options);
-    };
-
-    Record.prototype.forceAttributeChange = function forceAttributeChange(key, options = {}) {
-        const isRoot = begin$1(this);
-        if (markAsDirty$1(this, options)) {
-            trigger3$3(this, 'change:' + key, this, this.attributes[key], options);
+    }, {
+        key: "parse",
+        value: function parse(data, options) {
+            return this._parse(data);
         }
-        isRoot && _commit(this);
-    };
-
-    Record.prototype.dispose = function dispose() {
-        if (this._disposed) return;
-        this.forEachAttr(this.attributes, (value, key, attribute) => {
-            attribute.dispose(this, value);
-        });
-        _Transactional.prototype.dispose.call(this);
-    };
-
-    Record.prototype._log = function _log(level, text, value) {
-        log[level](`[Model Update] ${ this.getClassName() }: ` + text, value, 'Attributes spec:', this._attributes);
-    };
-
-    Record.prototype.getClassName = function getClassName() {
-        return _Transactional.prototype.getClassName.call(this) || 'Model';
-    };
-
-    createClass(Record, [{
+    }, {
+        key: "set",
+        value: function set$$1(a, b, c) {
+            if (typeof a === 'string') {
+                if (c) {
+                    return get(Record.prototype.__proto__ || Object.getPrototypeOf(Record.prototype), "set", this).call(this, { [a]: b }, c);
+                } else {
+                    setAttribute(this, a, b);
+                    return this;
+                }
+            } else {
+                return get(Record.prototype.__proto__ || Object.getPrototypeOf(Record.prototype), "set", this).call(this, a, b);
+            }
+        }
+    }, {
+        key: "deepSet",
+        value: function deepSet(name, value, options) {
+            this.transaction(() => {
+                const path = name.split('.'),
+                      l = path.length - 1,
+                      attr = path[l];
+                let model = this;
+                for (let i = 0; i < l; i++) {
+                    const key = path[i];
+                    let next = model.get ? model.get(key) : model[key];
+                    if (!next) {
+                        const attrSpecs = model._attributes;
+                        if (attrSpecs) {
+                            var newModel = attrSpecs[key].create();
+                            if (options && options.nullify && newModel._attributes) {
+                                newModel.clear(options);
+                            }
+                            model[key] = next = newModel;
+                        } else return;
+                    }
+                    model = next;
+                }
+                if (model.set) {
+                    model.set(attr, value, options);
+                } else {
+                    model[attr] = value;
+                }
+            });
+            return this;
+        }
+    }, {
+        key: "transaction",
+        value: function transaction(fun, options = {}) {
+            const isRoot = begin$1(this);
+            fun.call(this, this);
+            isRoot && _commit(this);
+        }
+    }, {
+        key: "_createTransaction",
+        value: function _createTransaction(a_values, options = {}) {
+            const isRoot = begin$1(this),
+                  changes = [],
+                  nested = [],
+                  { attributes } = this,
+                  values = options.parse ? this.parse(a_values, options) : a_values;
+            if (values && values.constructor === Object) {
+                this.forEachAttr(values, (value, key, attr) => {
+                    const prev = attributes[key];
+                    let update;
+                    if (update = attr.canBeUpdated(prev, value, options)) {
+                        const nestedTransaction = prev._createTransaction(update, options);
+                        if (nestedTransaction) {
+                            nested.push(nestedTransaction);
+                            if (attr.propagateChanges) changes.push(key);
+                        }
+                        return;
+                    }
+                    const next = attr.transform(value, options, prev, this);
+                    attributes[key] = next;
+                    if (attr.isChanged(next, prev)) {
+                        changes.push(key);
+                        attr.handleChange(next, prev, this);
+                    }
+                });
+            } else {
+                this._log('error', 'incompatible argument type', values);
+            }
+            if (changes.length && markAsDirty$1(this, options)) {
+                return new RecordTransaction(this, isRoot, nested, changes);
+            }
+            for (let pendingTransaction of nested) {
+                pendingTransaction.commit(this);
+            }
+            isRoot && _commit(this);
+        }
+    }, {
+        key: "_onChildrenChange",
+        value: function _onChildrenChange(child, options) {
+            const { _ownerKey } = child,
+                  attribute = this._attributes[_ownerKey];
+            if (!attribute || attribute.propagateChanges) this.forceAttributeChange(_ownerKey, options);
+        }
+    }, {
+        key: "forceAttributeChange",
+        value: function forceAttributeChange(key, options = {}) {
+            const isRoot = begin$1(this);
+            if (markAsDirty$1(this, options)) {
+                trigger3$3(this, 'change:' + key, this, this.attributes[key], options);
+            }
+            isRoot && _commit(this);
+        }
+    }, {
+        key: "dispose",
+        value: function dispose() {
+            if (this._disposed) return;
+            this.forEachAttr(this.attributes, (value, key, attribute) => {
+                attribute.dispose(this, value);
+            });
+            get(Record.prototype.__proto__ || Object.getPrototypeOf(Record.prototype), "dispose", this).call(this);
+        }
+    }, {
+        key: "_log",
+        value: function _log(level, text, value) {
+            log[level](`[Model Update] ${ this.getClassName() }: ` + text, value, 'Attributes spec:', this._attributes);
+        }
+    }, {
+        key: "getClassName",
+        value: function getClassName() {
+            return get(Record.prototype.__proto__ || Object.getPrototypeOf(Record.prototype), "getClassName", this).call(this) || 'Model';
+        }
+    }, {
         key: "__inner_state__",
         get: function () {
             return this.attributes;
@@ -1512,6 +1619,16 @@ let Record = Record_1 = function (_Transactional) {
         key: "collection",
         get: function () {
             return this._ownerKey ? null : this._owner;
+        }
+    }], [{
+        key: "define",
+        value: function define$$1(protoProps, staticProps) {
+            return Transactional.define(protoProps, staticProps);
+        }
+    }, {
+        key: "defaults",
+        value: function defaults$$1(attrs) {
+            return this.extend({ attributes: attrs });
         }
     }]);
     return Record;
@@ -1582,18 +1699,20 @@ let RecordTransaction = function () {
         this.changes = changes;
     }
 
-    RecordTransaction.prototype.commit = function commit(initiator) {
-        const { nested, object, changes } = this;
-        for (let transaction of nested) {
-            transaction.commit(object);
+    createClass(RecordTransaction, [{
+        key: "commit",
+        value: function commit(initiator) {
+            const { nested, object, changes } = this;
+            for (let transaction of nested) {
+                transaction.commit(object);
+            }
+            const { attributes, _isDirty } = object;
+            for (let key of changes) {
+                trigger3$3(object, 'change:' + key, object, attributes[key], _isDirty);
+            }
+            this.isRoot && _commit(object, initiator);
         }
-        const { attributes, _isDirty } = object;
-        for (let key of changes) {
-            trigger3$3(object, 'change:' + key, object, attributes[key], _isDirty);
-        }
-        this.isRoot && _commit(object, initiator);
-    };
-
+    }]);
     return RecordTransaction;
 }();
 
@@ -1638,73 +1757,88 @@ let AnyType = function () {
         }
     }
 
-    AnyType.create = function create(options, name) {
-        const type = options.type,
-              AttributeCtor = options._attribute || (type ? type._attribute : AnyType);
-        return new AttributeCtor(name, options);
-    };
-
-    AnyType.prototype.canBeUpdated = function canBeUpdated(prev, next, options) {};
-
-    AnyType.prototype.transform = function transform(value, options, prev, model) {
-        return value;
-    };
-
-    AnyType.prototype.convert = function convert(value, options, prev, model) {
-        return value;
-    };
-
-    AnyType.prototype.isChanged = function isChanged(a, b) {
-        return notEqual$1(a, b);
-    };
-
-    AnyType.prototype.handleChange = function handleChange(next, prev, model) {};
-
-    AnyType.prototype.create = function create() {
-        return new this.type();
-    };
-
-    AnyType.prototype.clone = function clone(value, record) {
-        if (value && typeof value === 'object') {
-            if (value.clone) return value.clone();
-            const proto = Object.getPrototypeOf(value);
-            if (proto === Object.prototype || proto === Array.prototype) {
-                return JSON.parse(JSON.stringify(value));
+    createClass(AnyType, [{
+        key: 'canBeUpdated',
+        value: function canBeUpdated(prev, next, options) {}
+    }, {
+        key: 'transform',
+        value: function transform(value, options, prev, model) {
+            return value;
+        }
+    }, {
+        key: 'convert',
+        value: function convert(value, options, prev, model) {
+            return value;
+        }
+    }, {
+        key: 'isChanged',
+        value: function isChanged(a, b) {
+            return notEqual$1(a, b);
+        }
+    }, {
+        key: 'handleChange',
+        value: function handleChange(next, prev, model) {}
+    }, {
+        key: 'create',
+        value: function create() {
+            return new this.type();
+        }
+    }, {
+        key: 'clone',
+        value: function clone(value, record) {
+            if (value && typeof value === 'object') {
+                if (value.clone) return value.clone();
+                const proto = Object.getPrototypeOf(value);
+                if (proto === Object.prototype || proto === Array.prototype) {
+                    return JSON.parse(JSON.stringify(value));
+                }
+            }
+            return value;
+        }
+    }, {
+        key: 'dispose',
+        value: function dispose(record, value) {}
+    }, {
+        key: 'validate',
+        value: function validate(record, value, key) {}
+    }, {
+        key: 'toJSON',
+        value: function toJSON(value, key) {
+            return value && value.toJSON ? value.toJSON() : value;
+        }
+    }, {
+        key: 'createPropertyDescriptor',
+        value: function createPropertyDescriptor() {
+            const { name, getHook } = this;
+            if (name !== 'id') {
+                return {
+                    set(value) {
+                        setAttribute(this, name, value);
+                    },
+                    get: getHook ? function () {
+                        return getHook.call(this, this.attributes[name], name);
+                    } : function () {
+                        return this.attributes[name];
+                    }
+                };
             }
         }
-        return value;
-    };
-
-    AnyType.prototype.dispose = function dispose(record, value) {};
-
-    AnyType.prototype.validate = function validate(record, value, key) {};
-
-    AnyType.prototype.toJSON = function toJSON(value, key) {
-        return value && value.toJSON ? value.toJSON() : value;
-    };
-
-    AnyType.prototype.createPropertyDescriptor = function createPropertyDescriptor() {
-        const { name, getHook } = this;
-        if (name !== 'id') {
-            return {
-                set(value) {
-                    setAttribute(this, name, value);
-                },
-                get: getHook ? function () {
-                    return getHook.call(this, this.attributes[name], name);
-                } : function () {
-                    return this.attributes[name];
-                }
-            };
+    }, {
+        key: 'initialize',
+        value: function initialize(name, options) {}
+    }, {
+        key: '_log',
+        value: function _log(level, text, value, record) {
+            log[level](`[Attribute Update] ${ record.getClassName() }.${ this.name }: ` + text, value, 'Attributes spec:', record._attributes);
         }
-    };
-
-    AnyType.prototype.initialize = function initialize(name, options) {};
-
-    AnyType.prototype._log = function _log(level, text, value, record) {
-        log[level](`[Attribute Update] ${ record.getClassName() }.${ this.name }: ` + text, value, 'Attributes spec:', record._attributes);
-    };
-
+    }], [{
+        key: 'create',
+        value: function create(options, name) {
+            const type = options.type,
+                  AttributeCtor = options._attribute || (type ? type._attribute : AnyType);
+            return new AttributeCtor(name, options);
+        }
+    }]);
     return AnyType;
 }();
 Record.prototype._attributes = { id: AnyType.create({ value: void 0 }, 'id') };
@@ -1739,65 +1873,75 @@ let AggregatedType = function (_AnyType) {
 
     function AggregatedType() {
         classCallCheck(this, AggregatedType);
-        return possibleConstructorReturn(this, _AnyType.apply(this, arguments));
+        return possibleConstructorReturn(this, (AggregatedType.__proto__ || Object.getPrototypeOf(AggregatedType)).apply(this, arguments));
     }
 
-    AggregatedType.prototype.clone = function clone(value) {
-        return value ? value.clone() : value;
-    };
-
-    AggregatedType.prototype.toJSON = function toJSON(x) {
-        return x && x.toJSON();
-    };
-
-    AggregatedType.prototype.canBeUpdated = function canBeUpdated(prev, next, options) {
-        if (prev && next != null) {
-            if (next instanceof this.type) {
-                if (options.merge) return next.__inner_state__;
-            } else {
-                return next;
+    createClass(AggregatedType, [{
+        key: 'clone',
+        value: function clone(value) {
+            return value ? value.clone() : value;
+        }
+    }, {
+        key: 'toJSON',
+        value: function toJSON(x) {
+            return x && x.toJSON();
+        }
+    }, {
+        key: 'canBeUpdated',
+        value: function canBeUpdated(prev, next, options) {
+            if (prev && next != null) {
+                if (next instanceof this.type) {
+                    if (options.merge) return next.__inner_state__;
+                } else {
+                    return next;
+                }
             }
         }
-    };
-
-    AggregatedType.prototype.convert = function convert(value, options, prev, record) {
-        if (value == null) return value;
-        if (value instanceof this.type) {
-            if (value._shared && !(value._shared & ItemsBehavior.persistent)) {
-                this._log('error', 'aggregated attribute is assigned with shared collection type', value, record);
+    }, {
+        key: 'convert',
+        value: function convert(value, options, prev, record) {
+            if (value == null) return value;
+            if (value instanceof this.type) {
+                if (value._shared && !(value._shared & ItemsBehavior.persistent)) {
+                    this._log('error', 'aggregated attribute is assigned with shared collection type', value, record);
+                }
+                return options.merge ? value.clone() : value;
             }
-            return options.merge ? value.clone() : value;
+            return this.type.create(value, options);
         }
-        return this.type.create(value, options);
-    };
-
-    AggregatedType.prototype.dispose = function dispose(record, value) {
-        if (value) {
-            free$1(record, value);
-            value.dispose();
+    }, {
+        key: 'dispose',
+        value: function dispose(record, value) {
+            if (value) {
+                free$1(record, value);
+                value.dispose();
+            }
         }
-    };
-
-    AggregatedType.prototype.validate = function validate(record, value) {
-        var error = value && value.validationError;
-        if (error) return error;
-    };
-
-    AggregatedType.prototype.create = function create() {
-        return this.type.create();
-    };
-
-    AggregatedType.prototype.initialize = function initialize(options) {
-        options.changeHandlers.unshift(this._handleChange);
-    };
-
-    AggregatedType.prototype._handleChange = function _handleChange(next, prev, record) {
-        prev && free$1(record, prev);
-        if (next && !aquire$1(record, next, this.name)) {
-            this._log('error', 'aggregated attribute assigned with object which is aggregated somewhere else', next, record);
+    }, {
+        key: 'validate',
+        value: function validate(record, value) {
+            var error = value && value.validationError;
+            if (error) return error;
         }
-    };
-
+    }, {
+        key: 'create',
+        value: function create() {
+            return this.type.create();
+        }
+    }, {
+        key: 'initialize',
+        value: function initialize(options) {
+            options.changeHandlers.unshift(this._handleChange);
+        }
+    }, {
+        key: '_handleChange',
+        value: function _handleChange(next, prev, record) {
+            prev && free$1(record, prev);
+            if (next && !aquire$1(record, next, this.name)) {
+                this._log('error', 'aggregated attribute assigned with object which is aggregated somewhere else', next, record);
+            }
+        }
+    }]);
     return AggregatedType;
 }(AnyType);
 Record._attribute = AggregatedType;
@@ -1807,38 +1951,44 @@ let DateType = function (_AnyType) {
 
     function DateType() {
         classCallCheck(this, DateType);
-        return possibleConstructorReturn(this, _AnyType.apply(this, arguments));
+        return possibleConstructorReturn(this, (DateType.__proto__ || Object.getPrototypeOf(DateType)).apply(this, arguments));
     }
 
-    DateType.prototype.convert = function convert(value, a, b, record) {
-        if (value == null || value instanceof Date) return value;
-        const date = new Date(value),
-              timestamp = date.getTime();
-        if (timestamp !== timestamp) {
-            this._log('warn', 'assigned with Invalid Date', value, record);
+    createClass(DateType, [{
+        key: 'convert',
+        value: function convert(value, a, b, record) {
+            if (value == null || value instanceof Date) return value;
+            const date = new Date(value),
+                  timestamp = date.getTime();
+            if (timestamp !== timestamp) {
+                this._log('warn', 'assigned with Invalid Date', value, record);
+            }
+            return date;
         }
-        return date;
-    };
-
-    DateType.prototype.validate = function validate(model, value, name) {
-        if (value != null) {
-            const timestamp = value.getTime();
-            if (timestamp !== timestamp) return name + ' is Invalid Date';
+    }, {
+        key: 'validate',
+        value: function validate(model, value, name) {
+            if (value != null) {
+                const timestamp = value.getTime();
+                if (timestamp !== timestamp) return name + ' is Invalid Date';
+            }
         }
-    };
-
-    DateType.prototype.toJSON = function toJSON(value) {
-        return value && value.toISOString();
-    };
-
-    DateType.prototype.isChanged = function isChanged(a, b) {
-        return (a && a.getTime()) !== (b && b.getTime());
-    };
-
-    DateType.prototype.clone = function clone(value) {
-        return value && new Date(value.getTime());
-    };
-
+    }, {
+        key: 'toJSON',
+        value: function toJSON(value) {
+            return value && value.toISOString();
+        }
+    }, {
+        key: 'isChanged',
+        value: function isChanged(a, b) {
+            return (a && a.getTime()) !== (b && b.getTime());
+        }
+    }, {
+        key: 'clone',
+        value: function clone(value) {
+            return value && new Date(value.getTime());
+        }
+    }]);
     return DateType;
 }(AnyType);
 Date._attribute = DateType;
@@ -1848,23 +1998,26 @@ let MSDateType = function (_DateType) {
 
     function MSDateType() {
         classCallCheck(this, MSDateType);
-        return possibleConstructorReturn(this, _DateType.apply(this, arguments));
+        return possibleConstructorReturn(this, (MSDateType.__proto__ || Object.getPrototypeOf(MSDateType)).apply(this, arguments));
     }
 
-    MSDateType.prototype.convert = function convert(value) {
-        if (typeof value === 'string') {
-            const msDate = msDatePattern.exec(value);
-            if (msDate) {
-                return new Date(Number(msDate[1]));
+    createClass(MSDateType, [{
+        key: 'convert',
+        value: function convert(value) {
+            if (typeof value === 'string') {
+                const msDate = msDatePattern.exec(value);
+                if (msDate) {
+                    return new Date(Number(msDate[1]));
+                }
             }
+            return DateType.prototype.convert.apply(this, arguments);
         }
-        return DateType.prototype.convert.apply(this, arguments);
-    };
-
-    MSDateType.prototype.toJSON = function toJSON(value) {
-        return value && `/Date(${ value.getTime() })/`;
-    };
-
+    }, {
+        key: 'toJSON',
+        value: function toJSON(value) {
+            return value && `/Date(${ value.getTime() })/`;
+        }
+    }]);
     return MSDateType;
 }(DateType);
 let TimestampType = function (_DateType2) {
@@ -1872,13 +2025,15 @@ let TimestampType = function (_DateType2) {
 
     function TimestampType() {
         classCallCheck(this, TimestampType);
-        return possibleConstructorReturn(this, _DateType2.apply(this, arguments));
+        return possibleConstructorReturn(this, (TimestampType.__proto__ || Object.getPrototypeOf(TimestampType)).apply(this, arguments));
     }
 
-    TimestampType.prototype.toJSON = function toJSON(value) {
-        return value.getTime();
-    };
-
+    createClass(TimestampType, [{
+        key: 'toJSON',
+        value: function toJSON(value) {
+            return value.getTime();
+        }
+    }]);
     return TimestampType;
 }(DateType);
 function supportsDate(date) {
@@ -1919,17 +2074,20 @@ let ConstructorType = function (_AnyType) {
 
     function ConstructorType() {
         classCallCheck(this, ConstructorType);
-        return possibleConstructorReturn(this, _AnyType.apply(this, arguments));
+        return possibleConstructorReturn(this, (ConstructorType.__proto__ || Object.getPrototypeOf(ConstructorType)).apply(this, arguments));
     }
 
-    ConstructorType.prototype.convert = function convert(value) {
-        return value == null || value instanceof this.type ? value : new this.type(value);
-    };
-
-    ConstructorType.prototype.clone = function clone(value) {
-        return value && value.clone ? value.clone() : this.convert(JSON.parse(JSON.stringify(value)));
-    };
-
+    createClass(ConstructorType, [{
+        key: 'convert',
+        value: function convert(value) {
+            return value == null || value instanceof this.type ? value : new this.type(value);
+        }
+    }, {
+        key: 'clone',
+        value: function clone(value) {
+            return value && value.clone ? value.clone() : this.convert(JSON.parse(JSON.stringify(value)));
+        }
+    }]);
     return ConstructorType;
 }(AnyType);
 
@@ -1939,29 +2097,35 @@ let PrimitiveType = function (_AnyType2) {
 
     function PrimitiveType() {
         classCallCheck(this, PrimitiveType);
-        return possibleConstructorReturn(this, _AnyType2.apply(this, arguments));
+        return possibleConstructorReturn(this, (PrimitiveType.__proto__ || Object.getPrototypeOf(PrimitiveType)).apply(this, arguments));
     }
 
-    PrimitiveType.prototype.create = function create() {
-        return this.type();
-    };
-
-    PrimitiveType.prototype.toJSON = function toJSON(value) {
-        return value;
-    };
-
-    PrimitiveType.prototype.convert = function convert(value) {
-        return value == null ? value : this.type(value);
-    };
-
-    PrimitiveType.prototype.isChanged = function isChanged(a, b) {
-        return a !== b;
-    };
-
-    PrimitiveType.prototype.clone = function clone(value) {
-        return value;
-    };
-
+    createClass(PrimitiveType, [{
+        key: 'create',
+        value: function create() {
+            return this.type();
+        }
+    }, {
+        key: 'toJSON',
+        value: function toJSON(value) {
+            return value;
+        }
+    }, {
+        key: 'convert',
+        value: function convert(value) {
+            return value == null ? value : this.type(value);
+        }
+    }, {
+        key: 'isChanged',
+        value: function isChanged(a, b) {
+            return a !== b;
+        }
+    }, {
+        key: 'clone',
+        value: function clone(value) {
+            return value;
+        }
+    }]);
     return PrimitiveType;
 }(AnyType);
 Boolean._attribute = String._attribute = PrimitiveType;
@@ -1970,23 +2134,26 @@ let NumericType = function (_PrimitiveType) {
 
     function NumericType() {
         classCallCheck(this, NumericType);
-        return possibleConstructorReturn(this, _PrimitiveType.apply(this, arguments));
+        return possibleConstructorReturn(this, (NumericType.__proto__ || Object.getPrototypeOf(NumericType)).apply(this, arguments));
     }
 
-    NumericType.prototype.convert = function convert(value, a, b, record) {
-        const num = value == null ? value : this.type(value);
-        if (num !== num) {
-            this._log('warn', 'assigned with Invalid Number', value, record);
+    createClass(NumericType, [{
+        key: 'convert',
+        value: function convert(value, a, b, record) {
+            const num = value == null ? value : this.type(value);
+            if (num !== num) {
+                this._log('warn', 'assigned with Invalid Number', value, record);
+            }
+            return num;
         }
-        return num;
-    };
-
-    NumericType.prototype.validate = function validate(model, value, name) {
-        if (value != null && !isFinite(value)) {
-            return name + ' is not valid number';
+    }, {
+        key: 'validate',
+        value: function validate(model, value, name) {
+            if (value != null && !isFinite(value)) {
+                return name + ' is not valid number';
+            }
         }
-    };
-
+    }]);
     return NumericType;
 }(PrimitiveType);
 Number._attribute = NumericType;
@@ -1995,23 +2162,27 @@ let ArrayType = function (_AnyType3) {
 
     function ArrayType() {
         classCallCheck(this, ArrayType);
-        return possibleConstructorReturn(this, _AnyType3.apply(this, arguments));
+        return possibleConstructorReturn(this, (ArrayType.__proto__ || Object.getPrototypeOf(ArrayType)).apply(this, arguments));
     }
 
-    ArrayType.prototype.toJSON = function toJSON(value) {
-        return value;
-    };
-
-    ArrayType.prototype.convert = function convert(value, a, b, record) {
-        if (value == null || Array.isArray(value)) return value;
-        this._log('warn', 'assigned with non-array', value, record);
-        return [];
-    };
-
-    ArrayType.prototype.clone = function clone(value) {
-        return value && value.slice();
-    };
-
+    createClass(ArrayType, [{
+        key: 'toJSON',
+        value: function toJSON(value) {
+            return value;
+        }
+    }, {
+        key: 'convert',
+        value: function convert(value, a, b, record) {
+            if (value == null || Array.isArray(value)) return value;
+            this._log('warn', 'assigned with non-array', value, record);
+            return [];
+        }
+    }, {
+        key: 'clone',
+        value: function clone(value) {
+            return value && value.slice();
+        }
+    }]);
     return ArrayType;
 }(AnyType);
 Array._attribute = ArrayType;
@@ -2024,75 +2195,85 @@ let SharedType = function (_AnyType) {
 
     function SharedType() {
         classCallCheck(this, SharedType);
-        return possibleConstructorReturn(this, _AnyType.apply(this, arguments));
+        return possibleConstructorReturn(this, (SharedType.__proto__ || Object.getPrototypeOf(SharedType)).apply(this, arguments));
     }
 
-    SharedType.prototype.clone = function clone(value, record) {
-        if (!value || value._owner !== record) return value;
-        const clone = value.clone();
-        aquire$2(record, clone, this.name);
-        return clone;
-    };
-
-    SharedType.prototype.toJSON = function toJSON() {};
-
-    SharedType.prototype.canBeUpdated = function canBeUpdated(prev, next, options) {
-        if (prev && next != null) {
-            if (next instanceof this.type) {
-                if (options.merge) return next.__inner_state__;
-            } else {
-                return next;
+    createClass(SharedType, [{
+        key: 'clone',
+        value: function clone(value, record) {
+            if (!value || value._owner !== record) return value;
+            const clone = value.clone();
+            aquire$2(record, clone, this.name);
+            return clone;
+        }
+    }, {
+        key: 'toJSON',
+        value: function toJSON() {}
+    }, {
+        key: 'canBeUpdated',
+        value: function canBeUpdated(prev, next, options) {
+            if (prev && next != null) {
+                if (next instanceof this.type) {
+                    if (options.merge) return next.__inner_state__;
+                } else {
+                    return next;
+                }
             }
         }
-    };
-
-    SharedType.prototype.convert = function convert(value, options, prev, record) {
-        if (value == null || value instanceof this.type) return value;
-        const implicitObject = new this.type(value, options, shareAndListen);
-        aquire$2(record, implicitObject, this.name);
-        return implicitObject;
-    };
-
-    SharedType.prototype.validate = function validate(model, value, name) {};
-
-    SharedType.prototype.create = function create() {
-        return null;
-    };
-
-    SharedType.prototype._handleChange = function _handleChange(next, prev, record) {
-        if (prev) {
-            if (prev._owner === record) {
-                free$2(record, prev);
-            } else {
-                off$4(prev, prev._changeEventName, this._onChange, record);
+    }, {
+        key: 'convert',
+        value: function convert(value, options, prev, record) {
+            if (value == null || value instanceof this.type) return value;
+            const implicitObject = new this.type(value, options, shareAndListen);
+            aquire$2(record, implicitObject, this.name);
+            return implicitObject;
+        }
+    }, {
+        key: 'validate',
+        value: function validate(model, value, name) {}
+    }, {
+        key: 'create',
+        value: function create() {
+            return null;
+        }
+    }, {
+        key: '_handleChange',
+        value: function _handleChange(next, prev, record) {
+            if (prev) {
+                if (prev._owner === record) {
+                    free$2(record, prev);
+                } else {
+                    off$4(prev, prev._changeEventName, this._onChange, record);
+                }
+            }
+            if (next) {
+                if (next._owner !== record) {
+                    on$4(next, next._changeEventName, this._onChange, record);
+                }
             }
         }
-        if (next) {
-            if (next._owner !== record) {
-                on$4(next, next._changeEventName, this._onChange, record);
+    }, {
+        key: 'dispose',
+        value: function dispose(record, value) {
+            if (value) {
+                if (value._owner === record) {
+                    free$2(record, value);
+                    value.dispose();
+                } else {
+                    off$4(value, value._changeEventName, this._onChange, record);
+                }
             }
         }
-    };
-
-    SharedType.prototype.dispose = function dispose(record, value) {
-        if (value) {
-            if (value._owner === record) {
-                free$2(record, value);
-                value.dispose();
-            } else {
-                off$4(value, value._changeEventName, this._onChange, record);
-            }
+    }, {
+        key: 'initialize',
+        value: function initialize(options) {
+            const attribute = this;
+            this._onChange = this.propagateChanges ? function (child, options, initiator) {
+                this === initiator || this.forceAttributeChange(attribute.name, options);
+            } : ignore;
+            options.changeHandlers.unshift(this._handleChange);
         }
-    };
-
-    SharedType.prototype.initialize = function initialize(options) {
-        const attribute = this;
-        this._onChange = this.propagateChanges ? function (child, options, initiator) {
-            this === initiator || this.forceAttributeChange(attribute.name, options);
-        } : ignore;
-        options.changeHandlers.unshift(this._handleChange);
-    };
-
+    }]);
     return SharedType;
 }(AnyType);
 function ignore() {}
@@ -2107,80 +2288,90 @@ let ChainableAttributeSpec = function () {
         if (options) assign$6(this.options, options);
     }
 
-    ChainableAttributeSpec.prototype.check = function check(_check, error) {
-        function validate(model, value, name) {
-            if (!_check.call(model, value, name)) {
-                const msg = error || _check.error || name + ' is not valid';
-                return typeof msg === 'function' ? msg.call(model, name) : msg;
-            }
-        }
-        const prev = this.options.validate;
-        return this.metadata({
-            validate: prev ? function (model, value, name) {
-                return prev(model, value, name) || validate(model, value, name);
-            } : validate
-        });
-    };
-
-    ChainableAttributeSpec.prototype.watcher = function watcher(ref) {
-        return this.metadata({ _onChange: ref });
-    };
-
-    ChainableAttributeSpec.prototype.parse = function parse(fun) {
-        return this.metadata({ parse: fun });
-    };
-
-    ChainableAttributeSpec.prototype.toJSON = function toJSON(fun) {
-        return this.metadata({
-            toJSON: typeof fun === 'function' ? fun : fun ? x => x && x.toJSON() : emptyFunction
-        });
-    };
-
-    ChainableAttributeSpec.prototype.get = function get$$1(fun) {
-        return this.metadata({
-            getHooks: this.options.getHooks.concat(fun)
-        });
-    };
-
-    ChainableAttributeSpec.prototype.set = function set$$1(fun) {
-        function handleSetHook(next, options, prev, model) {
-            if (this.isChanged(next, prev)) {
-                var changed = fun.call(model, next, this.name);
-                return changed === void 0 ? prev : this.convert(changed, options, prev, model);
-            }
-            return prev;
-        }
-        return this.metadata({
-            transforms: this.options.transforms.concat(handleSetHook)
-        });
-    };
-
-    ChainableAttributeSpec.prototype.changeEvents = function changeEvents(events) {
-        return this.metadata({ changeEvents: events });
-    };
-
-    ChainableAttributeSpec.prototype.events = function events(map) {
-        const eventMap = new EventMap(map);
-        function handleEventsSubscribtion(next, prev, record) {
-            prev && prev.trigger && eventMap.unsubscribe(record, prev);
-            next && next.trigger && eventMap.subscribe(record, next);
-        }
-        return this.metadata({
-            changeHandlers: this.options.changeHandlers.concat(handleEventsSubscribtion)
-        });
-    };
-
-    ChainableAttributeSpec.prototype.metadata = function metadata(options) {
-        const cloned = new ChainableAttributeSpec(this.options);
-        assign$6(cloned.options, options);
-        return cloned;
-    };
-
-    ChainableAttributeSpec.prototype.value = function value(x) {
-        return this.metadata({ value: x });
-    };
-
     createClass(ChainableAttributeSpec, [{
+        key: 'check',
+        value: function check(_check, error) {
+            function validate(model, value, name) {
+                if (!_check.call(model, value, name)) {
+                    const msg = error || _check.error || name + ' is not valid';
+                    return typeof msg === 'function' ? msg.call(model, name) : msg;
+                }
+            }
+            const prev = this.options.validate;
+            return this.metadata({
+                validate: prev ? function (model, value, name) {
+                    return prev(model, value, name) || validate(model, value, name);
+                } : validate
+            });
+        }
+    }, {
+        key: 'watcher',
+        value: function watcher(ref) {
+            return this.metadata({ _onChange: ref });
+        }
+    }, {
+        key: 'parse',
+        value: function parse(fun) {
+            return this.metadata({ parse: fun });
+        }
+    }, {
+        key: 'toJSON',
+        value: function toJSON(fun) {
+            return this.metadata({
+                toJSON: typeof fun === 'function' ? fun : fun ? x => x && x.toJSON() : emptyFunction
+            });
+        }
+    }, {
+        key: 'get',
+        value: function get$$1(fun) {
+            return this.metadata({
+                getHooks: this.options.getHooks.concat(fun)
+            });
+        }
+    }, {
+        key: 'set',
+        value: function set$$1(fun) {
+            function handleSetHook(next, options, prev, model) {
+                if (this.isChanged(next, prev)) {
+                    var changed = fun.call(model, next, this.name);
+                    return changed === void 0 ? prev : this.convert(changed, options, prev, model);
+                }
+                return prev;
+            }
+            return this.metadata({
+                transforms: this.options.transforms.concat(handleSetHook)
+            });
+        }
+    }, {
+        key: 'changeEvents',
+        value: function changeEvents(events) {
+            return this.metadata({ changeEvents: events });
+        }
+    }, {
+        key: 'events',
+        value: function events(map) {
+            const eventMap = new EventMap(map);
+            function handleEventsSubscribtion(next, prev, record) {
+                prev && prev.trigger && eventMap.unsubscribe(record, prev);
+                next && next.trigger && eventMap.subscribe(record, next);
+            }
+            return this.metadata({
+                changeHandlers: this.options.changeHandlers.concat(handleEventsSubscribtion)
+            });
+        }
+    }, {
+        key: 'metadata',
+        value: function metadata(options) {
+            const cloned = new ChainableAttributeSpec(this.options);
+            assign$6(cloned.options, options);
+            return cloned;
+        }
+    }, {
+        key: 'value',
+        value: function value(x) {
+            return this.metadata({ value: x });
+        }
+    }, {
         key: 'isRequired',
         get: function () {
             return this.metadata({ isRequired: true });
@@ -2536,36 +2727,38 @@ let CollectionTransaction = function () {
         this.sorted = sorted;
     }
 
-    CollectionTransaction.prototype.commit = function commit(initiator) {
-        const { nested, object } = this,
-              { _isDirty } = object;
-        for (let transaction of nested) {
-            transaction.commit(object);
+    createClass(CollectionTransaction, [{
+        key: 'commit',
+        value: function commit(initiator) {
+            const { nested, object } = this,
+                  { _isDirty } = object;
+            for (let transaction of nested) {
+                transaction.commit(object);
+            }
+            if (object._aggregationError) {
+                logAggregationError(object);
+            }
+            for (let transaction of nested) {
+                trigger2$4(object, 'change', transaction.object, _isDirty);
+            }
+            const { added, removed } = this;
+            for (let record of added) {
+                trigger3$4(record, 'add', record, object, _isDirty);
+                trigger3$4(object, 'add', record, object, _isDirty);
+            }
+            for (let record of removed) {
+                trigger3$4(record, 'remove', record, object, _isDirty);
+                trigger3$4(object, 'remove', record, object, _isDirty);
+            }
+            if (this.sorted) {
+                trigger2$4(object, 'sort', object, _isDirty);
+            }
+            if (added.length || removed.length) {
+                trigger2$4(object, 'update', object, _isDirty);
+            }
+            this.isRoot && _commit$1(object, initiator);
         }
-        if (object._aggregationError) {
-            logAggregationError(object);
-        }
-        for (let transaction of nested) {
-            trigger2$4(object, 'change', transaction.object, _isDirty);
-        }
-        const { added, removed } = this;
-        for (let record of added) {
-            trigger3$4(record, 'add', record, object, _isDirty);
-            trigger3$4(object, 'add', record, object, _isDirty);
-        }
-        for (let record of removed) {
-            trigger3$4(record, 'remove', record, object, _isDirty);
-            trigger3$4(object, 'remove', record, object, _isDirty);
-        }
-        if (this.sorted) {
-            trigger2$4(object, 'sort', object, _isDirty);
-        }
-        if (added.length || removed.length) {
-            trigger2$4(object, 'update', object, _isDirty);
-        }
-        this.isRoot && _commit$1(object, initiator);
-    };
-
+    }]);
     return CollectionTransaction;
 }();
 function logAggregationError(collection) {
@@ -2817,7 +3010,7 @@ let CollectionRefsType = function (_SharedType) {
 
     function CollectionRefsType() {
         classCallCheck(this, CollectionRefsType);
-        return possibleConstructorReturn(this, _SharedType.apply(this, arguments));
+        return possibleConstructorReturn(this, (CollectionRefsType.__proto__ || Object.getPrototypeOf(CollectionRefsType)).apply(this, arguments));
     }
 
     return CollectionRefsType;
@@ -2830,7 +3023,7 @@ let Collection = Collection_1 = function (_Transactional) {
     function Collection(records, options = {}, shared) {
         classCallCheck(this, Collection);
 
-        var _this2 = possibleConstructorReturn(this, _Transactional.call(this, _count++));
+        var _this2 = possibleConstructorReturn(this, (Collection.__proto__ || Object.getPrototypeOf(Collection)).call(this, _count++));
 
         _this2.models = [];
         _this2._byId = {};
@@ -2855,248 +3048,252 @@ let Collection = Collection_1 = function (_Transactional) {
         return _this2;
     }
 
-    Collection.prototype.createSubset = function createSubset(models, options) {
-        const SubsetOf = this.constructor.subsetOf(this).options.type,
-              subset = new SubsetOf(models, options);
-        subset.resolve(this);
-        return subset;
-    };
-
-    Collection.predefine = function predefine$$1() {
-        const Ctor = this;
-        this._SubsetOf = null;
-        function RefsCollection(a, b, listen) {
-            Ctor.call(this, a, b, ItemsBehavior.share | (listen ? ItemsBehavior.listen : 0));
+    createClass(Collection, [{
+        key: "createSubset",
+        value: function createSubset(models, options) {
+            const SubsetOf = this.constructor.subsetOf(this).options.type,
+                  subset = new SubsetOf(models, options);
+            subset.resolve(this);
+            return subset;
         }
-        Mixable.mixTo(RefsCollection);
-        RefsCollection.prototype = this.prototype;
-        RefsCollection._attribute = CollectionRefsType;
-        this.Refs = this.Subset = RefsCollection;
-        Transactional.predefine.call(this);
-        createSharedTypeSpec(this, SharedType);
-        return this;
-    };
-
-    Collection.define = function define$$1(protoProps = {}, staticProps) {
-        const staticsDefinition = getChangedStatics(this, 'comparator', 'model', 'itemEvents'),
-              definition = assign$1(staticsDefinition, protoProps);
-        const spec = omit$1(definition, 'itemEvents');
-        if (definition.itemEvents) {
-            const eventsMap = new EventMap(this.prototype._itemEvents);
-            eventsMap.addEventsMap(definition.itemEvents);
-            spec._itemEvents = eventsMap;
+    }, {
+        key: "getStore",
+        value: function getStore() {
+            return this._store || (this._store = this._owner ? this._owner.getStore() : this._defaultStore);
         }
-        return Transactional.define.call(this, spec, staticProps);
-    };
-
-    Collection.prototype.getStore = function getStore() {
-        return this._store || (this._store = this._owner ? this._owner.getStore() : this._defaultStore);
-    };
-
-    Collection.prototype._onChildrenChange = function _onChildrenChange(record, options = {}, initiator) {
-        if (initiator === this) return;
-        const { idAttribute } = this;
-        if (record.hasChanged(idAttribute)) {
-            updateIndex(this._byId, record);
-        }
-        const isRoot = begin(this);
-        if (markAsDirty(this, options)) {
-            trigger2$2(this, 'change', record, options);
-        }
-        isRoot && commit(this);
-    };
-
-    Collection.prototype.get = function get$$1(objOrId) {
-        if (objOrId == null) return;
-        if (typeof objOrId === 'object') {
-            const id = objOrId[this.idAttribute];
-            return id !== void 0 && this._byId[id] || this._byId[objOrId.cid];
-        } else {
-            return this._byId[objOrId];
-        }
-    };
-
-    Collection.prototype.each = function each(iteratee, context) {
-        const fun = context !== void 0 ? (v, k) => iteratee.call(context, v, k) : iteratee,
-              { models } = this;
-        for (let i = 0; i < models.length; i++) {
-            fun(models[i], i);
-        }
-    };
-
-    Collection.prototype.map = function map(iteratee, context) {
-        return _map(this.models, iteratee);
-    };
-
-    Collection.prototype._validateNested = function _validateNested(errors) {
-        if (this._shared) return 0;
-        let count = 0;
-        this.each(record => {
-            const error = record.validationError;
-            if (error) {
-                errors[record.cid] = error;
-                count++;
+    }, {
+        key: "_onChildrenChange",
+        value: function _onChildrenChange(record, options = {}, initiator) {
+            if (initiator === this) return;
+            const { idAttribute } = this;
+            if (record.hasChanged(idAttribute)) {
+                updateIndex(this._byId, record);
             }
-        });
-        return count;
-    };
-
-    Collection.prototype.initialize = function initialize() {};
-
-    Collection.prototype.first = function first() {
-        return this.models[0];
-    };
-
-    Collection.prototype.last = function last() {
-        return this.models[this.models.length - 1];
-    };
-
-    Collection.prototype.at = function at(a_index) {
-        const index = a_index < 0 ? a_index + this.models.length : a_index;
-        return this.models[index];
-    };
-
-    Collection.prototype.clone = function clone(options = {}) {
-        const models = this._shared & ItemsBehavior.share ? this.models : this.map(model => model.clone()),
-              copy = new this.constructor(models, { model: this.model, comparator: this.comparator }, this._shared);
-        if (options.pinStore) copy._defaultStore = this.getStore();
-        return copy;
-    };
-
-    Collection.prototype.toJSON = function toJSON() {
-        return this.models.map(model => model.toJSON());
-    };
-
-    Collection.prototype.set = function set$$1(elements = [], options = {}) {
-        if (options.add !== void 0) {
-            this._log('warn', "Collection.set doesn't support 'add' option, behaving as if options.add === true.", options);
-        }
-        if (options.reset) {
-            this.reset(elements, options);
-        } else {
-            const transaction = this._createTransaction(elements, options);
-            transaction && transaction.commit();
-        }
-        return this;
-    };
-
-    Collection.prototype.dispose = function dispose$$1() {
-        if (this._disposed) return;
-        const aggregated = !this._shared;
-        for (let record of this.models) {
-            free$3(this, record);
-            if (aggregated) record.dispose();
-        }
-        _Transactional.prototype.dispose.call(this);
-    };
-
-    Collection.prototype.reset = function reset(a_elements, options = {}) {
-        const isRoot = begin(this),
-              previousModels = dispose(this);
-        if (a_elements) {
-            emptySetTransaction(this, toElements(this, a_elements, options), options, true);
-        }
-        markAsDirty(this, options);
-        options.silent || trigger2$2(this, 'reset', this, defaults$2({ previousModels: previousModels }, options));
-        isRoot && commit(this);
-        return this.models;
-    };
-
-    Collection.prototype.add = function add(a_elements, options = {}) {
-        const elements = toElements(this, a_elements, options),
-              transaction = this.models.length ? addTransaction(this, elements, options) : emptySetTransaction(this, elements, options);
-        if (transaction) {
-            transaction.commit();
-            return transaction.added;
-        }
-    };
-
-    Collection.prototype.remove = function remove(recordsOrIds, options = {}) {
-        if (recordsOrIds) {
-            return Array.isArray(recordsOrIds) ? removeMany(this, recordsOrIds, options) : removeOne(this, recordsOrIds, options);
-        }
-        return [];
-    };
-
-    Collection.prototype._createTransaction = function _createTransaction(a_elements, options = {}) {
-        const elements = toElements(this, a_elements, options);
-        if (this.models.length) {
-            return options.remove === false ? addTransaction(this, elements, options, true) : setTransaction(this, elements, options);
-        } else {
-            return emptySetTransaction(this, elements, options);
-        }
-    };
-
-    Collection.prototype.pluck = function pluck(key) {
-        return this.models.map(model => model[key]);
-    };
-
-    Collection.prototype.sort = function sort(options = {}) {
-        if (sortElements(this, options)) {
             const isRoot = begin(this);
             if (markAsDirty(this, options)) {
-                trigger2$2(this, 'sort', this, options);
+                trigger2$2(this, 'change', record, options);
             }
             isRoot && commit(this);
         }
-        return this;
-    };
-
-    Collection.prototype.push = function push(model, options) {
-        return this.add(model, assign$1({ at: this.length }, options));
-    };
-
-    Collection.prototype.pop = function pop(options) {
-        var model = this.at(this.length - 1);
-        this.remove(model, options);
-        return model;
-    };
-
-    Collection.prototype.unshift = function unshift(model, options) {
-        return this.add(model, assign$1({ at: 0 }, options));
-    };
-
-    Collection.prototype.shift = function shift(options) {
-        var model = this.at(0);
-        this.remove(model, options);
-        return model;
-    };
-
-    Collection.prototype.slice = function slice() {
-        return _slice.apply(this.models, arguments);
-    };
-
-    Collection.prototype.indexOf = function indexOf(modelOrId) {
-        const record = this.get(modelOrId);
-        return this.models.indexOf(record);
-    };
-
-    Collection.prototype.modelId = function modelId(attrs) {
-        return attrs[this.model.prototype.idAttribute];
-    };
-
-    Collection.prototype.toggle = function toggle(model, a_next) {
-        var prev = Boolean(this.get(model)),
-            next = a_next === void 0 ? !prev : Boolean(a_next);
-        if (prev !== next) {
-            if (prev) {
-                this.remove(model);
+    }, {
+        key: "get",
+        value: function get$$1(objOrId) {
+            if (objOrId == null) return;
+            if (typeof objOrId === 'object') {
+                const id = objOrId[this.idAttribute];
+                return id !== void 0 && this._byId[id] || this._byId[objOrId.cid];
             } else {
-                this.add(model);
+                return this._byId[objOrId];
             }
         }
-        return next;
-    };
-
-    Collection.prototype._log = function _log(level, text, value) {
-        log[level](`[Collection Update] ${ this.model.prototype.getClassName() }.${ this.getClassName() }: ` + text, value, 'Attributes spec:', this.model.prototype._attributes);
-    };
-
-    Collection.prototype.getClassName = function getClassName() {
-        return _Transactional.prototype.getClassName.call(this) || 'Collection';
-    };
-
-    createClass(Collection, [{
+    }, {
+        key: "each",
+        value: function each(iteratee, context) {
+            const fun = context !== void 0 ? (v, k) => iteratee.call(context, v, k) : iteratee,
+                  { models } = this;
+            for (let i = 0; i < models.length; i++) {
+                fun(models[i], i);
+            }
+        }
+    }, {
+        key: "map",
+        value: function map(iteratee, context) {
+            return _map(this.models, iteratee);
+        }
+    }, {
+        key: "_validateNested",
+        value: function _validateNested(errors) {
+            if (this._shared) return 0;
+            let count = 0;
+            this.each(record => {
+                const error = record.validationError;
+                if (error) {
+                    errors[record.cid] = error;
+                    count++;
+                }
+            });
+            return count;
+        }
+    }, {
+        key: "initialize",
+        value: function initialize() {}
+    }, {
+        key: "first",
+        value: function first() {
+            return this.models[0];
+        }
+    }, {
+        key: "last",
+        value: function last() {
+            return this.models[this.models.length - 1];
+        }
+    }, {
+        key: "at",
+        value: function at(a_index) {
+            const index = a_index < 0 ? a_index + this.models.length : a_index;
+            return this.models[index];
+        }
+    }, {
+        key: "clone",
+        value: function clone(options = {}) {
+            const models = this._shared & ItemsBehavior.share ? this.models : this.map(model => model.clone()),
+                  copy = new this.constructor(models, { model: this.model, comparator: this.comparator }, this._shared);
+            if (options.pinStore) copy._defaultStore = this.getStore();
+            return copy;
+        }
+    }, {
+        key: "toJSON",
+        value: function toJSON() {
+            return this.models.map(model => model.toJSON());
+        }
+    }, {
+        key: "set",
+        value: function set$$1(elements = [], options = {}) {
+            if (options.add !== void 0) {
+                this._log('warn', "Collection.set doesn't support 'add' option, behaving as if options.add === true.", options);
+            }
+            if (options.reset) {
+                this.reset(elements, options);
+            } else {
+                const transaction = this._createTransaction(elements, options);
+                transaction && transaction.commit();
+            }
+            return this;
+        }
+    }, {
+        key: "dispose",
+        value: function dispose$$1() {
+            if (this._disposed) return;
+            const aggregated = !this._shared;
+            for (let record of this.models) {
+                free$3(this, record);
+                if (aggregated) record.dispose();
+            }
+            get(Collection.prototype.__proto__ || Object.getPrototypeOf(Collection.prototype), "dispose", this).call(this);
+        }
+    }, {
+        key: "reset",
+        value: function reset(a_elements, options = {}) {
+            const isRoot = begin(this),
+                  previousModels = dispose(this);
+            if (a_elements) {
+                emptySetTransaction(this, toElements(this, a_elements, options), options, true);
+            }
+            markAsDirty(this, options);
+            options.silent || trigger2$2(this, 'reset', this, defaults$2({ previousModels: previousModels }, options));
+            isRoot && commit(this);
+            return this.models;
+        }
+    }, {
+        key: "add",
+        value: function add(a_elements, options = {}) {
+            const elements = toElements(this, a_elements, options),
+                  transaction = this.models.length ? addTransaction(this, elements, options) : emptySetTransaction(this, elements, options);
+            if (transaction) {
+                transaction.commit();
+                return transaction.added;
+            }
+        }
+    }, {
+        key: "remove",
+        value: function remove(recordsOrIds, options = {}) {
+            if (recordsOrIds) {
+                return Array.isArray(recordsOrIds) ? removeMany(this, recordsOrIds, options) : removeOne(this, recordsOrIds, options);
+            }
+            return [];
+        }
+    }, {
+        key: "_createTransaction",
+        value: function _createTransaction(a_elements, options = {}) {
+            const elements = toElements(this, a_elements, options);
+            if (this.models.length) {
+                return options.remove === false ? addTransaction(this, elements, options, true) : setTransaction(this, elements, options);
+            } else {
+                return emptySetTransaction(this, elements, options);
+            }
+        }
+    }, {
+        key: "pluck",
+        value: function pluck(key) {
+            return this.models.map(model => model[key]);
+        }
+    }, {
+        key: "sort",
+        value: function sort(options = {}) {
+            if (sortElements(this, options)) {
+                const isRoot = begin(this);
+                if (markAsDirty(this, options)) {
+                    trigger2$2(this, 'sort', this, options);
+                }
+                isRoot && commit(this);
+            }
+            return this;
+        }
+    }, {
+        key: "push",
+        value: function push(model, options) {
+            return this.add(model, assign$1({ at: this.length }, options));
+        }
+    }, {
+        key: "pop",
+        value: function pop(options) {
+            var model = this.at(this.length - 1);
+            this.remove(model, options);
+            return model;
+        }
+    }, {
+        key: "unshift",
+        value: function unshift(model, options) {
+            return this.add(model, assign$1({ at: 0 }, options));
+        }
+    }, {
+        key: "shift",
+        value: function shift(options) {
+            var model = this.at(0);
+            this.remove(model, options);
+            return model;
+        }
+    }, {
+        key: "slice",
+        value: function slice() {
+            return _slice.apply(this.models, arguments);
+        }
+    }, {
+        key: "indexOf",
+        value: function indexOf(modelOrId) {
+            const record = this.get(modelOrId);
+            return this.models.indexOf(record);
+        }
+    }, {
+        key: "modelId",
+        value: function modelId(attrs) {
+            return attrs[this.model.prototype.idAttribute];
+        }
+    }, {
+        key: "toggle",
+        value: function toggle(model, a_next) {
+            var prev = Boolean(this.get(model)),
+                next = a_next === void 0 ? !prev : Boolean(a_next);
+            if (prev !== next) {
+                if (prev) {
+                    this.remove(model);
+                } else {
+                    this.add(model);
+                }
+            }
+            return next;
+        }
+    }, {
+        key: "_log",
+        value: function _log(level, text, value) {
+            log[level](`[Collection Update] ${ this.model.prototype.getClassName() }.${ this.getClassName() }: ` + text, value, 'Attributes spec:', this.model.prototype._attributes);
+        }
+    }, {
+        key: "getClassName",
+        value: function getClassName() {
+            return get(Collection.prototype.__proto__ || Object.getPrototypeOf(Collection.prototype), "getClassName", this).call(this) || 'Collection';
+        }
+    }, {
         key: "__inner_state__",
         get: function () {
             return this.models;
@@ -3138,6 +3335,35 @@ let Collection = Collection_1 = function (_Transactional) {
         get: function () {
             return this.models.length;
         }
+    }], [{
+        key: "predefine",
+        value: function predefine$$1() {
+            const Ctor = this;
+            this._SubsetOf = null;
+            function RefsCollection(a, b, listen) {
+                Ctor.call(this, a, b, ItemsBehavior.share | (listen ? ItemsBehavior.listen : 0));
+            }
+            Mixable.mixTo(RefsCollection);
+            RefsCollection.prototype = this.prototype;
+            RefsCollection._attribute = CollectionRefsType;
+            this.Refs = this.Subset = RefsCollection;
+            Transactional.predefine.call(this);
+            createSharedTypeSpec(this, SharedType);
+            return this;
+        }
+    }, {
+        key: "define",
+        value: function define$$1(protoProps = {}, staticProps) {
+            const staticsDefinition = getChangedStatics(this, 'comparator', 'model', 'itemEvents'),
+                  definition = assign$1(staticsDefinition, protoProps);
+            const spec = omit$1(definition, 'itemEvents');
+            if (definition.itemEvents) {
+                const eventsMap = new EventMap(this.prototype._itemEvents);
+                eventsMap.addEventsMap(definition.itemEvents);
+                spec._itemEvents = eventsMap;
+            }
+            return Transactional.define.call(this, spec, staticProps);
+        }
     }]);
     return Collection;
 }(Transactional);
@@ -3173,25 +3399,30 @@ let RecordRefType = function (_AnyType) {
 
     function RecordRefType() {
         classCallCheck(this, RecordRefType);
-        return possibleConstructorReturn(this, _AnyType.apply(this, arguments));
+        return possibleConstructorReturn(this, (RecordRefType.__proto__ || Object.getPrototypeOf(RecordRefType)).apply(this, arguments));
     }
 
-    RecordRefType.prototype.toJSON = function toJSON(value) {
-        return value && typeof value === 'object' ? value.id : value;
-    };
-
-    RecordRefType.prototype.clone = function clone(value) {
-        return value && typeof value === 'object' ? value.id : value;
-    };
-
-    RecordRefType.prototype.isChanged = function isChanged(a, b) {
-        var aId = a && (a.id == null ? a : a.id),
-            bId = b && (b.id == null ? b : b.id);
-        return aId !== bId;
-    };
-
-    RecordRefType.prototype.validate = function validate(model, value, name) {};
-
+    createClass(RecordRefType, [{
+        key: 'toJSON',
+        value: function toJSON(value) {
+            return value && typeof value === 'object' ? value.id : value;
+        }
+    }, {
+        key: 'clone',
+        value: function clone(value) {
+            return value && typeof value === 'object' ? value.id : value;
+        }
+    }, {
+        key: 'isChanged',
+        value: function isChanged(a, b) {
+            var aId = a && (a.id == null ? a : a.id),
+                bId = b && (b.id == null ? b : b.id);
+            return aId !== bId;
+        }
+    }, {
+        key: 'validate',
+        value: function validate(model, value, name) {}
+    }]);
     return RecordRefType;
 }(AnyType);
 
@@ -3246,90 +3477,102 @@ function defineSubsetCollection(CollectionConstructor) {
         function SubsetOfCollection(recordsOrIds, options) {
             classCallCheck(this, SubsetOfCollection);
 
-            var _this = possibleConstructorReturn(this, _CollectionConstructo.call(this, recordsOrIds, subsetOptions(options), subsetOfBehavior));
+            var _this = possibleConstructorReturn(this, (SubsetOfCollection.__proto__ || Object.getPrototypeOf(SubsetOfCollection)).call(this, recordsOrIds, subsetOptions(options), subsetOfBehavior));
 
             _this.resolvedWith = null;
             return _this;
         }
 
-        SubsetOfCollection.prototype.add = function add(elements, options) {
-            return _CollectionConstructo.prototype.add.call(this, elements, subsetOptions(options));
-        };
-
-        SubsetOfCollection.prototype.reset = function reset(elements, options) {
-            return _CollectionConstructo.prototype.reset.call(this, elements, subsetOptions(options));
-        };
-
-        SubsetOfCollection.prototype._createTransaction = function _createTransaction(elements, options) {
-            return _CollectionConstructo.prototype._createTransaction.call(this, elements, subsetOptions(options));
-        };
-
-        SubsetOfCollection.prototype.toJSON = function toJSON() {
-            return this.refs ? this.refs.map(objOrId => objOrId.id || objOrId) : this.models.map(model => model.id);
-        };
-
-        SubsetOfCollection.prototype._validateNested = function _validateNested() {
-            return 0;
-        };
-
-        SubsetOfCollection.prototype.clone = function clone(owner) {
-            var Ctor = this.constructor,
-                copy = new Ctor([], {
-                model: this.model,
-                comparator: this.comparator
-            });
-            if (this.resolvedWith) {
-                copy.resolvedWith = this.resolvedWith;
-                copy.reset(this.models, { silent: true });
-            } else {
-                copy.refs = this.refs;
-            }
-            return copy;
-        };
-
-        SubsetOfCollection.prototype.parse = function parse(raw) {
-            const { resolvedWith } = this,
-                  elements = Array.isArray(raw) ? raw : [raw],
-                  records = [];
-            if (resolvedWith) {
-                for (let element of elements) {
-                    const record = resolvedWith.get(element);
-                    if (record) records.push(record);
-                }
-            } else if (elements.length) {
-                this.refs = elements;
-            }
-            return records;
-        };
-
-        SubsetOfCollection.prototype.resolve = function resolve(collection) {
-            if (collection && collection.length) {
-                this.resolvedWith = collection;
-                if (this.refs) {
-                    this.reset(this.refs, { silent: true });
-                    this.refs = null;
-                }
-            }
-            return this;
-        };
-
-        SubsetOfCollection.prototype.getModelIds = function getModelIds() {
-            return this.toJSON();
-        };
-
-        SubsetOfCollection.prototype.toggle = function toggle(modelOrId, val) {
-            return _CollectionConstructo.prototype.toggle.call(this, this.resolvedWith.get(modelOrId), val);
-        };
-
-        SubsetOfCollection.prototype.addAll = function addAll() {
-            return this.reset(this.resolvedWith.models);
-        };
-
-        SubsetOfCollection.prototype.toggleAll = function toggleAll() {
-            return this.length ? this.reset() : this.addAll();
-        };
-
         createClass(SubsetOfCollection, [{
+            key: "add",
+            value: function add(elements, options) {
+                return get(SubsetOfCollection.prototype.__proto__ || Object.getPrototypeOf(SubsetOfCollection.prototype), "add", this).call(this, elements, subsetOptions(options));
+            }
+        }, {
+            key: "reset",
+            value: function reset(elements, options) {
+                return get(SubsetOfCollection.prototype.__proto__ || Object.getPrototypeOf(SubsetOfCollection.prototype), "reset", this).call(this, elements, subsetOptions(options));
+            }
+        }, {
+            key: "_createTransaction",
+            value: function _createTransaction(elements, options) {
+                return get(SubsetOfCollection.prototype.__proto__ || Object.getPrototypeOf(SubsetOfCollection.prototype), "_createTransaction", this).call(this, elements, subsetOptions(options));
+            }
+        }, {
+            key: "toJSON",
+            value: function toJSON() {
+                return this.refs ? this.refs.map(objOrId => objOrId.id || objOrId) : this.models.map(model => model.id);
+            }
+        }, {
+            key: "_validateNested",
+            value: function _validateNested() {
+                return 0;
+            }
+        }, {
+            key: "clone",
+            value: function clone(owner) {
+                var Ctor = this.constructor,
+                    copy = new Ctor([], {
+                    model: this.model,
+                    comparator: this.comparator
+                });
+                if (this.resolvedWith) {
+                    copy.resolvedWith = this.resolvedWith;
+                    copy.reset(this.models, { silent: true });
+                } else {
+                    copy.refs = this.refs;
+                }
+                return copy;
+            }
+        }, {
+            key: "parse",
+            value: function parse(raw) {
+                const { resolvedWith } = this,
+                      elements = Array.isArray(raw) ? raw : [raw],
+                      records = [];
+                if (resolvedWith) {
+                    for (let element of elements) {
+                        const record = resolvedWith.get(element);
+                        if (record) records.push(record);
+                    }
+                } else if (elements.length) {
+                    this.refs = elements;
+                }
+                return records;
+            }
+        }, {
+            key: "resolve",
+            value: function resolve(collection) {
+                if (collection && collection.length) {
+                    this.resolvedWith = collection;
+                    if (this.refs) {
+                        this.reset(this.refs, { silent: true });
+                        this.refs = null;
+                    }
+                }
+                return this;
+            }
+        }, {
+            key: "getModelIds",
+            value: function getModelIds() {
+                return this.toJSON();
+            }
+        }, {
+            key: "toggle",
+            value: function toggle(modelOrId, val) {
+                return get(SubsetOfCollection.prototype.__proto__ || Object.getPrototypeOf(SubsetOfCollection.prototype), "toggle", this).call(this, this.resolvedWith.get(modelOrId), val);
+            }
+        }, {
+            key: "addAll",
+            value: function addAll() {
+                return this.reset(this.resolvedWith.models);
+            }
+        }, {
+            key: "toggleAll",
+            value: function toggleAll() {
+                return this.length ? this.reset() : this.addAll();
+            }
+        }, {
             key: "__inner_state__",
             get: function () {
                 return this.refs || this.models;
@@ -3347,20 +3590,22 @@ let Store = function (_Record) {
 
     function Store() {
         classCallCheck(this, Store);
-        return possibleConstructorReturn(this, _Record.apply(this, arguments));
+        return possibleConstructorReturn(this, (Store.__proto__ || Object.getPrototypeOf(Store)).apply(this, arguments));
     }
 
-    Store.prototype.getStore = function getStore() {
-        return this;
-    };
-
-    Store.prototype.get = function get$$1(name) {
-        let local = this[name];
-        if (local || this === this._defaultStore) return local;
-        return this._owner ? this._owner.get(name) : this._defaultStore.get(name);
-    };
-
-    createClass(Store, null, [{
+    createClass(Store, [{
+        key: 'getStore',
+        value: function getStore() {
+            return this;
+        }
+    }, {
+        key: 'get',
+        value: function get$$1(name) {
+            let local = this[name];
+            if (local || this === this._defaultStore) return local;
+            return this._owner ? this._owner.get(name) : this._defaultStore.get(name);
+        }
+    }], [{
         key: 'global',
         get: function () {
             return _store;

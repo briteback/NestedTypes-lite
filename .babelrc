@@ -1,13 +1,14 @@
 {
   "presets": [
     [
-      "stage-0"
+      "es2015",
+       {
+         "modules": false,
+         "loose": true
+       }
     ]
   ],
   "plugins": [
-    ["transform-es2015-classes", {
-      "loose": true
-    }],
     "external-helpers",
     "lodash"
    ]
